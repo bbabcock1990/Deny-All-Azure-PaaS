@@ -18,8 +18,9 @@ targetScope = 'managementGroup'
 @description('Custom message returned to the caller when a deployment is denied.')
 param nonComplianceMessage string = 'Private Endpoints Must Be Enabled - No Public Access'
 
-@description('Name of the policy assignment.')
-param assignmentName string = 'enforce-private-endpoints-paas'
+@description('Name of the policy assignment. Azure caps assignment names at 24 characters.')
+@maxLength(24)
+param assignmentName string = 'alz-deny-public-paas'
 
 @description('Display name shown for the assignment.')
 param assignmentDisplayName string = 'Enforce private endpoints across PaaS services (ALZ)'

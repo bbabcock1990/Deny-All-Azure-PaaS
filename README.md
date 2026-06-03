@@ -12,7 +12,7 @@ The initiative bundles **45 policies** that block creation of Azure PaaS resourc
 |---|---|
 | `policySetDefinitions/Deny-PublicPaaSEndpoints` | ALZ initiative (44 built-in policies + 1 custom) |
 | `policyDefinitions/Deny-LogicApp-Public-Network` | Custom ALZ policy (only one not in the built-in catalog) |
-| `policyAssignments/enforce-private-endpoints-paas` | New — carries the custom non-compliance / deny message |
+| `policyAssignments/alz-deny-public-paas` | New — carries the custom non-compliance / deny message |
 
 ## Layout
 
@@ -45,7 +45,7 @@ az deployment mg create \
 | Parameter | Default | Notes |
 |---|---|---|
 | `nonComplianceMessage` | `Private Endpoints Must Be Enabled - No Public Access` | Surfaced to the caller when a deploy is denied |
-| `assignmentName` | `enforce-private-endpoints-paas` | |
+| `assignmentName` | `alz-deny-public-paas` | Max 24 characters (Azure limit) |
 | `assignmentDisplayName` | `Enforce private endpoints across PaaS services (ALZ)` | |
 | `overrideEffectsGlobally` | `false` | If `true`, forces every bundled policy parameter to `effect` |
 | `effect` | `Deny` | Only used when `overrideEffectsGlobally = true` |
