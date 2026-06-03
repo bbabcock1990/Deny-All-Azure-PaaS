@@ -1,0 +1,12 @@
+# Bicep build artifacts
+*.json.bak
+main.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
