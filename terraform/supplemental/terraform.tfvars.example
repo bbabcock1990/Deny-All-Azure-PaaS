@@ -1,0 +1,12 @@
+# Required — the target management group (NAME, not display name)
+management_group_id = "alz"
+
+# Optional — override defaults below. All values shown match the module
+# defaults; uncomment and edit to change.
+
+# custom_policy_definition_name_prefix = ""
+# initiative_name                      = "Deny-PublicPaaSEndpoints-Supplemental"
+# assignment_name                      = "deny-pna-supplemental"
+# assignment_display_name              = "Enforce private endpoints across PaaS services (Supplemental)"
+# non_compliance_message               = "Private Endpoints Must Be Enabled - No Public Access"
+# effect                               = "Deny"

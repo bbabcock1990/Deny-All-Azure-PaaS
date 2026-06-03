@@ -1,0 +1,57 @@
+{
+  "name": "Deny-DigitalTwins-Public-Network-Access",
+  "type": "Microsoft.Authorization/policyDefinitions",
+  "apiVersion": "2021-06-01",
+  "scope": null,
+  "properties": {
+    "policyType": "Custom",
+    "mode": "All",
+    "displayName": "Azure Digital Twins should disable public network access",
+    "description": "Disabling public network access improves security by ensuring that an Azure Digital Twins instance is only reachable through a private endpoint. Digital Twins private link support is in Preview. Learn more at: https://learn.microsoft.com/azure/digital-twins/concepts-security#private-network-access-with-azure-private-link.",
+    "metadata": {
+      "version": "1.0.0",
+      "category": "Digital Twins",
+      "source": "https://github.com/bbabcock1990/Deny-All-Azure-PaaS"
+    },
+    "parameters": {
+      "effect": {
+        "type": "String",
+        "allowedValues": [
+          "Audit",
+          "Deny",
+          "Disabled"
+        ],
+        "defaultValue": "Deny",
+        "metadata": {
+          "displayName": "Effect",
+          "description": "Enable or disable the execution of the policy"
+        }
+      }
+    },
+    "policyRule": {
+      "if": {
+        "allOf": [
+          {
+            "field": "type",
+            "equals": "Microsoft.DigitalTwins/digitalTwinsInstances"
+          },
+          {
+            "anyOf": [
+              {
+                "field": "Microsoft.DigitalTwins/digitalTwinsInstances/publicNetworkAccess",
+                "exists": "false"
+              },
+              {
+                "field": "Microsoft.DigitalTwins/digitalTwinsInstances/publicNetworkAccess",
+                "notEquals": "Disabled"
+              }
+            ]
+          }
+        ]
+      },
+      "then": {
+        "effect": "[parameters('effect')]"
+      }
+    }
+  }
+}

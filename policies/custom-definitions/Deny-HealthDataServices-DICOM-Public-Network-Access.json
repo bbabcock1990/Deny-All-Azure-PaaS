@@ -1,0 +1,57 @@
+{
+  "name": "Deny-HealthDataServices-DICOM-Public-Network-Access",
+  "type": "Microsoft.Authorization/policyDefinitions",
+  "apiVersion": "2021-06-01",
+  "scope": null,
+  "properties": {
+    "policyType": "Custom",
+    "mode": "All",
+    "displayName": "Azure Health Data Services DICOM service should disable public network access",
+    "description": "Disabling public network access improves security by ensuring that the DICOM service inside a Health Data Services workspace (Microsoft.HealthcareApis/workspaces/dicomservices) is only reachable through a private endpoint. This child policy is additive to the workspace-level policy and prevents a DICOM service from overriding the workspace setting.",
+    "metadata": {
+      "version": "1.0.0",
+      "category": "Health Data Services workspace",
+      "source": "https://github.com/bbabcock1990/Deny-All-Azure-PaaS"
+    },
+    "parameters": {
+      "effect": {
+        "type": "String",
+        "allowedValues": [
+          "Audit",
+          "Deny",
+          "Disabled"
+        ],
+        "defaultValue": "Deny",
+        "metadata": {
+          "displayName": "Effect",
+          "description": "Enable or disable the execution of the policy"
+        }
+      }
+    },
+    "policyRule": {
+      "if": {
+        "allOf": [
+          {
+            "field": "type",
+            "equals": "Microsoft.HealthcareApis/workspaces/dicomservices"
+          },
+          {
+            "anyOf": [
+              {
+                "field": "Microsoft.HealthcareApis/workspaces/dicomservices/publicNetworkAccess",
+                "exists": "false"
+              },
+              {
+                "field": "Microsoft.HealthcareApis/workspaces/dicomservices/publicNetworkAccess",
+                "notEquals": "Disabled"
+              }
+            ]
+          }
+        ]
+      },
+      "then": {
+        "effect": "[parameters('effect')]"
+      }
+    }
+  }
+}

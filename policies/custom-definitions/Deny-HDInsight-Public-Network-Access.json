@@ -1,0 +1,57 @@
+{
+  "name": "Deny-HDInsight-Public-Network-Access",
+  "type": "Microsoft.Authorization/policyDefinitions",
+  "apiVersion": "2021-06-01",
+  "scope": null,
+  "properties": {
+    "policyType": "Custom",
+    "mode": "All",
+    "displayName": "Azure HDInsight clusters should disable public access (require Private Link)",
+    "description": "HDInsight does not expose a publicNetworkAccess field. Instead, a cluster is considered private only when networkProperties.privateLink is set to Enabled at creation time. This policy denies the creation of HDInsight clusters that do not have Private Link enabled. Learn more at: https://learn.microsoft.com/azure/hdinsight/hdinsight-private-link.",
+    "metadata": {
+      "version": "1.0.0",
+      "category": "HDInsight",
+      "source": "https://github.com/bbabcock1990/Deny-All-Azure-PaaS"
+    },
+    "parameters": {
+      "effect": {
+        "type": "String",
+        "allowedValues": [
+          "Audit",
+          "Deny",
+          "Disabled"
+        ],
+        "defaultValue": "Deny",
+        "metadata": {
+          "displayName": "Effect",
+          "description": "Enable or disable the execution of the policy"
+        }
+      }
+    },
+    "policyRule": {
+      "if": {
+        "allOf": [
+          {
+            "field": "type",
+            "equals": "Microsoft.HDInsight/clusters"
+          },
+          {
+            "anyOf": [
+              {
+                "field": "Microsoft.HDInsight/clusters/networkProperties.privateLink",
+                "exists": "false"
+              },
+              {
+                "field": "Microsoft.HDInsight/clusters/networkProperties.privateLink",
+                "notEquals": "Enabled"
+              }
+            ]
+          }
+        ]
+      },
+      "then": {
+        "effect": "[parameters('effect')]"
+      }
+    }
+  }
+}

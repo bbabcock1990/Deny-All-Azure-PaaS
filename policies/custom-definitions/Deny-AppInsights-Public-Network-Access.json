@@ -1,0 +1,65 @@
+{
+  "name": "Deny-AppInsights-Public-Network-Access",
+  "type": "Microsoft.Authorization/policyDefinitions",
+  "apiVersion": "2021-06-01",
+  "scope": null,
+  "properties": {
+    "policyType": "Custom",
+    "mode": "All",
+    "displayName": "Application Insights components should disable public network access for ingestion and query",
+    "description": "Improve Application Insights security by blocking log ingestion and querying from public networks. This denies creation when either publicNetworkAccessForIngestion or publicNetworkAccessForQuery is not set to Disabled. Only Private Link (AMPLS) connected networks will be able to ingest and query telemetry. Learn more at: https://aka.ms/AzMonPrivateLink#configure-application-insights.",
+    "metadata": {
+      "version": "1.0.0",
+      "category": "Monitoring",
+      "source": "https://github.com/bbabcock1990/Deny-All-Azure-PaaS"
+    },
+    "parameters": {
+      "effect": {
+        "type": "String",
+        "allowedValues": [
+          "Audit",
+          "Deny",
+          "Disabled"
+        ],
+        "defaultValue": "Deny",
+        "metadata": {
+          "displayName": "Effect",
+          "description": "Enable or disable the execution of the policy"
+        }
+      }
+    },
+    "policyRule": {
+      "if": {
+        "allOf": [
+          {
+            "field": "type",
+            "equals": "Microsoft.Insights/components"
+          },
+          {
+            "anyOf": [
+              {
+                "field": "Microsoft.Insights/components/publicNetworkAccessForIngestion",
+                "exists": "false"
+              },
+              {
+                "field": "Microsoft.Insights/components/publicNetworkAccessForIngestion",
+                "notEquals": "Disabled"
+              },
+              {
+                "field": "Microsoft.Insights/components/publicNetworkAccessForQuery",
+                "exists": "false"
+              },
+              {
+                "field": "Microsoft.Insights/components/publicNetworkAccessForQuery",
+                "notEquals": "Disabled"
+              }
+            ]
+          }
+        ]
+      },
+      "then": {
+        "effect": "[parameters('effect')]"
+      }
+    }
+  }
+}

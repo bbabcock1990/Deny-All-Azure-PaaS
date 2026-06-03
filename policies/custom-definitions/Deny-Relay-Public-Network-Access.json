@@ -1,0 +1,57 @@
+{
+  "name": "Deny-Relay-Public-Network-Access",
+  "type": "Microsoft.Authorization/policyDefinitions",
+  "apiVersion": "2021-06-01",
+  "scope": null,
+  "properties": {
+    "policyType": "Custom",
+    "mode": "All",
+    "displayName": "Azure Relay namespaces should disable public network access",
+    "description": "Disabling public network access improves security by ensuring that the Azure Relay namespace is not exposed on the public internet. Azure Relay supports private endpoints; clients should connect via Private Link only. Learn more at: https://learn.microsoft.com/azure/azure-relay/private-link-service.",
+    "metadata": {
+      "version": "1.0.0",
+      "category": "Relay",
+      "source": "https://github.com/bbabcock1990/Deny-All-Azure-PaaS"
+    },
+    "parameters": {
+      "effect": {
+        "type": "String",
+        "allowedValues": [
+          "Audit",
+          "Deny",
+          "Disabled"
+        ],
+        "defaultValue": "Deny",
+        "metadata": {
+          "displayName": "Effect",
+          "description": "Enable or disable the execution of the policy"
+        }
+      }
+    },
+    "policyRule": {
+      "if": {
+        "allOf": [
+          {
+            "field": "type",
+            "equals": "Microsoft.Relay/namespaces"
+          },
+          {
+            "anyOf": [
+              {
+                "field": "Microsoft.Relay/namespaces/publicNetworkAccess",
+                "exists": "false"
+              },
+              {
+                "field": "Microsoft.Relay/namespaces/publicNetworkAccess",
+                "notEquals": "Disabled"
+              }
+            ]
+          }
+        ]
+      },
+      "then": {
+        "effect": "[parameters('effect')]"
+      }
+    }
+  }
+}

@@ -1,0 +1,65 @@
+{
+  "name": "Deny-LogAnalytics-Public-Network-Access",
+  "type": "Microsoft.Authorization/policyDefinitions",
+  "apiVersion": "2021-06-01",
+  "scope": null,
+  "properties": {
+    "policyType": "Custom",
+    "mode": "All",
+    "displayName": "Log Analytics workspaces should disable public network access for ingestion and query",
+    "description": "Improve workspace security by blocking log ingestion and querying from public networks. This denies creation when either publicNetworkAccessForIngestion or publicNetworkAccessForQuery is not set to Disabled. Only Private Link (AMPLS) connected networks will be able to ingest and query logs. Learn more at: https://aka.ms/AzMonPrivateLink#configure-log-analytics.",
+    "metadata": {
+      "version": "1.0.0",
+      "category": "Monitoring",
+      "source": "https://github.com/bbabcock1990/Deny-All-Azure-PaaS"
+    },
+    "parameters": {
+      "effect": {
+        "type": "String",
+        "allowedValues": [
+          "Audit",
+          "Deny",
+          "Disabled"
+        ],
+        "defaultValue": "Deny",
+        "metadata": {
+          "displayName": "Effect",
+          "description": "Enable or disable the execution of the policy"
+        }
+      }
+    },
+    "policyRule": {
+      "if": {
+        "allOf": [
+          {
+            "field": "type",
+            "equals": "Microsoft.OperationalInsights/workspaces"
+          },
+          {
+            "anyOf": [
+              {
+                "field": "Microsoft.OperationalInsights/workspaces/publicNetworkAccessForIngestion",
+                "exists": "false"
+              },
+              {
+                "field": "Microsoft.OperationalInsights/workspaces/publicNetworkAccessForIngestion",
+                "notEquals": "Disabled"
+              },
+              {
+                "field": "Microsoft.OperationalInsights/workspaces/publicNetworkAccessForQuery",
+                "exists": "false"
+              },
+              {
+                "field": "Microsoft.OperationalInsights/workspaces/publicNetworkAccessForQuery",
+                "notEquals": "Disabled"
+              }
+            ]
+          }
+        ]
+      },
+      "then": {
+        "effect": "[parameters('effect')]"
+      }
+    }
+  }
+}

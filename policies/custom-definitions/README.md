@@ -20,6 +20,8 @@ Custom definitions in this folder follow a single template (see below) so they c
 
 ## What's in here today
 
+17 custom policy definitions, all bundled into the supplemental initiative (`../policy_set_definition_supplemental.json`):
+
 | File | Resource type | Field checked |
 |---|---|---|
 | `Deny-SignalR-Public-Network-Access.json` | `Microsoft.SignalRService/SignalR` | `publicNetworkAccess` |
@@ -28,7 +30,24 @@ Custom definitions in this folder follow a single template (see below) so they c
 | `Deny-IoTDps-Public-Network-Access.json` | `Microsoft.Devices/provisioningServices` | `publicNetworkAccess` |
 | `Deny-Purview-Public-Network-Access.json` | `Microsoft.Purview/accounts` | `publicNetworkAccess` |
 | `Deny-HealthcareApis-Services-Public-Network-Access.json` | `Microsoft.HealthcareApis/services` (legacy FHIR/DICOM) | `publicNetworkAccess` |
-| `Deny-HealthDataServices-Workspace-Public-Network-Access.json` | `Microsoft.HealthcareApis/workspaces` (Health Data Services workspace) | `publicNetworkAccess` |
+| `Deny-HealthDataServices-Workspace-Public-Network-Access.json` | `Microsoft.HealthcareApis/workspaces` | `publicNetworkAccess` |
+| `Deny-HealthDataServices-FHIR-Public-Network-Access.json` | `Microsoft.HealthcareApis/workspaces/fhirservices` | `publicNetworkAccess` |
+| `Deny-HealthDataServices-DICOM-Public-Network-Access.json` | `Microsoft.HealthcareApis/workspaces/dicomservices` | `publicNetworkAccess` |
+| `Deny-StaticWebApps-Public-Network-Access.json` | `Microsoft.Web/staticSites` | `publicNetworkAccess` |
+| `Deny-Relay-Public-Network-Access.json` | `Microsoft.Relay/namespaces` | `publicNetworkAccess` |
+| `Deny-HDInsight-Public-Network-Access.json` | `Microsoft.HDInsight/clusters` | `networkProperties.privateLink` must be `Enabled` |
+| `Deny-CommunicationServices-Public-Network-Access.json` | `Microsoft.Communication/communicationServices` | `publicNetworkAccess` |
+| `Deny-DigitalTwins-Public-Network-Access.json` | `Microsoft.DigitalTwins/digitalTwinsInstances` | `publicNetworkAccess` (Preview Private Link) |
+| `Deny-VideoIndexer-Public-Network-Access.json` | `Microsoft.VideoIndexer/accounts` | `publicNetworkAccess` |
+| `Deny-LogAnalytics-Public-Network-Access.json` | `Microsoft.OperationalInsights/workspaces` | both `publicNetworkAccessForIngestion` and `...ForQuery` |
+| `Deny-AppInsights-Public-Network-Access.json` | `Microsoft.Insights/components` | both `publicNetworkAccessForIngestion` and `...ForQuery` |
+
+### Definitions with non-standard rules
+
+Most files follow the standard "deny when `publicNetworkAccess != Disabled`" template. These ones diverge:
+
+- **HDInsight** — has no `publicNetworkAccess` property. We deny when `networkProperties.privateLink != Enabled` (the only way to make an HDInsight cluster private is at creation time).
+- **Log Analytics** & **App Insights** — have two separate fields (`publicNetworkAccessForIngestion` + `publicNetworkAccessForQuery`). We deny when *either* is not `Disabled`.
 
 ---
 
