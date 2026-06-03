@@ -1,29 +1,39 @@
 // =============================================================================
-// Wrapper: deploy the ALZ "Deny-PublicPaaSEndpoints" initiative + its one
-// custom policy dependency, and assign it with a custom deny message.
+// Deny-All-Azure-PaaS — Bicep implementation
 // -----------------------------------------------------------------------------
-// Files consumed (must sit next to this .bicep):
-//   ./policy_set_definition_es_Deny-PublicPaaSEndpoints.json
-//   ./policy_definitions/policy_definition_es_Deny-LogicApp-Public-Network.json
+// Deploys the ALZ "Deny-PublicPaaSEndpoints" initiative + its one custom
+// policy dependency at a management group, and assigns it with a custom
+// non-compliance / deny message.
 //
-// Both files are pulled verbatim from
-//   https://github.com/Azure/ALZ-Bicep  (infra-as-code/bicep/modules/policy)
-//
-// Re-running this template after updating those two JSON files is the upgrade
-// path — no rule rewriting required.
+// Loads source-of-truth JSON from ../policies/ (kept in sync with
+// Azure/ALZ-Bicep). Resource NAMES (definition, initiative, assignment) are
+// fully customisable via parameters — the underlying policy logic is not
+// touched, so re-pulling the ALZ JSON is still a clean upgrade.
 // =============================================================================
 
 targetScope = 'managementGroup'
 
-@description('Custom message returned to the caller when a deployment is denied.')
-param nonComplianceMessage string = 'Private Endpoints Must Be Enabled - No Public Access'
+// ---------------------------------------------------------------------------
+// Naming (override these to match your org's standards)
+// ---------------------------------------------------------------------------
+@description('Name of the custom Logic App policy definition (the one ALZ-custom dependency).')
+param customPolicyDefinitionName string = 'Deny-LogicApp-Public-Network'
+
+@description('Name of the policy set definition (initiative).')
+param initiativeName string = 'Deny-PublicPaaSEndpoints'
 
 @description('Name of the policy assignment. Azure caps assignment names at 24 characters.')
 @maxLength(24)
 param assignmentName string = 'alz-deny-public-paas'
 
-@description('Display name shown for the assignment.')
+@description('Display name shown for the assignment in the portal.')
 param assignmentDisplayName string = 'Enforce private endpoints across PaaS services (ALZ)'
+
+// ---------------------------------------------------------------------------
+// Behaviour
+// ---------------------------------------------------------------------------
+@description('Custom message returned to the caller when a deployment is denied.')
+param nonComplianceMessage string = 'Private Endpoints Must Be Enabled - No Public Access'
 
 @description('Force every bundled policy parameter to the value of `effect`. False (default) respects ALZ initiative defaults — 43 of 45 already default to Deny.')
 param overrideEffectsGlobally bool = false
@@ -37,29 +47,32 @@ param overrideEffectsGlobally bool = false
 param effect string = 'Deny'
 
 // ---------------------------------------------------------------------------
-// 1. Load the ALZ source files (source of truth)
+// 1. Load the ALZ source files (single source of truth — DO NOT hand-edit)
 // ---------------------------------------------------------------------------
-var initiativeFile      = loadJsonContent('./policy_set_definition_es_Deny-PublicPaaSEndpoints.json')
-var logicAppPolicyFile  = loadJsonContent('./policy_definitions/policy_definition_es_Deny-LogicApp-Public-Network.json')
+var initiativeFile     = loadJsonContent('../policies/policy_set_definition_es_Deny-PublicPaaSEndpoints.json')
+var logicAppPolicyFile = loadJsonContent('../policies/policy_definitions/policy_definition_es_Deny-LogicApp-Public-Network.json')
 
 // ---------------------------------------------------------------------------
 // 2. Deploy the one custom policy definition the initiative depends on
 // ---------------------------------------------------------------------------
 resource logicAppPolicy 'Microsoft.Authorization/policyDefinitions@2023-04-01' = {
-  name: logicAppPolicyFile.name
+  name: customPolicyDefinitionName
   properties: logicAppPolicyFile.properties
 }
 
 // ---------------------------------------------------------------------------
-// 3. Resolve the ${varTargetManagementGroupResourceId} placeholder embedded
-//    in the initiative's policyDefinitions[] entries.
+// 3. Resolve the initiative's policyDefinitions[] references.
+//   The ALZ source references the custom Logic App policy via the literal
+//   string "/policyDefinitions/Deny-LogicApp-Public-Network". Whenever we
+//   spot that suffix, swap the entire URL for the deployed resource's actual
+//   .id — which handles BOTH the MG-placeholder substitution AND any rename
+//   via `customPolicyDefinitionName`.
 // ---------------------------------------------------------------------------
-var mgResourceIdPlaceholder = '\${varTargetManagementGroupResourceId}'
-var targetMgResourceId      = managementGroup().id
+var alzCustomPolicySuffix = '/policyDefinitions/Deny-LogicApp-Public-Network'
 
 var resolvedPolicyDefs = [for p in initiativeFile.properties.policyDefinitions: {
   policyDefinitionReferenceId: p.policyDefinitionReferenceId
-  policyDefinitionId: replace(p.policyDefinitionId, mgResourceIdPlaceholder, targetMgResourceId)
+  policyDefinitionId: endsWith(p.policyDefinitionId, alzCustomPolicySuffix) ? logicAppPolicy.id : p.policyDefinitionId
   parameters: p.parameters
   groupNames: p.groupNames
   definitionVersion: p.definitionVersion
@@ -69,7 +82,7 @@ var resolvedPolicyDefs = [for p in initiativeFile.properties.policyDefinitions: 
 // 4. Deploy the initiative as a custom policy set
 // ---------------------------------------------------------------------------
 resource initiative 'Microsoft.Authorization/policySetDefinitions@2023-04-01' = {
-  name: initiativeFile.name
+  name: initiativeName
   properties: {
     displayName: initiativeFile.properties.displayName
     description: initiativeFile.properties.description
@@ -77,7 +90,7 @@ resource initiative 'Microsoft.Authorization/policySetDefinitions@2023-04-01' = 
     metadata: initiativeFile.properties.metadata
     parameters: initiativeFile.properties.parameters
     policyDefinitions: resolvedPolicyDefs
-    policyDefinitionGroups: initiativeFile.properties.policyDefinitionGroups
+    policyDefinitionGroups: initiativeFile.properties.?policyDefinitionGroups ?? []
   }
   dependsOn: [
     logicAppPolicy
@@ -85,7 +98,7 @@ resource initiative 'Microsoft.Authorization/policySetDefinitions@2023-04-01' = 
 }
 
 // ---------------------------------------------------------------------------
-// 5. Build optional global effect overrides — { paramName: { value: effect } }
+// 5. Optional global effect override — { paramName: { value: effect } }
 // ---------------------------------------------------------------------------
 var globalEffectOverrides = toObject(
   items(initiativeFile.properties.parameters),
@@ -94,9 +107,9 @@ var globalEffectOverrides = toObject(
 )
 
 // ---------------------------------------------------------------------------
-// 6. Build per-reference non-compliance messages
-//    (initiative assignments only surface the deny message when each entry
-//     includes a policyDefinitionReferenceId).
+// 6. Per-reference non-compliance messages
+//   (initiative assignments only surface the deny message when each entry
+//   includes a policyDefinitionReferenceId — so we emit one per bundled policy)
 // ---------------------------------------------------------------------------
 var nonComplianceMessageList = [for p in initiativeFile.properties.policyDefinitions: {
   message: nonComplianceMessage
