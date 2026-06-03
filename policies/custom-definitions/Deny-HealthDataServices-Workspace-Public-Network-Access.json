@@ -1,0 +1,57 @@
+{
+  "name": "Deny-HealthDataServices-Workspace-Public-Network-Access",
+  "type": "Microsoft.Authorization/policyDefinitions",
+  "apiVersion": "2021-06-01",
+  "scope": null,
+  "properties": {
+    "policyType": "Custom",
+    "mode": "All",
+    "displayName": "Azure Health Data Services workspace should disable public network access",
+    "description": "Disabling public network access improves security by ensuring that the Azure Health Data Services workspace (Microsoft.HealthcareApis/workspaces) is not exposed on the public internet and can only be reached from a private endpoint. Microsoft's built-in policy only audits for an approved private endpoint connection; this custom definition denies on the publicNetworkAccess field for stronger enforcement. Child FHIR and DICOM services inherit the workspace's connectivity unless they explicitly override it. Learn more at: https://aka.ms/healthcareapisprivatelink.",
+    "metadata": {
+      "version": "1.0.0",
+      "category": "Health Data Services workspace",
+      "source": "https://github.com/bbabcock1990/Deny-All-Azure-PaaS"
+    },
+    "parameters": {
+      "effect": {
+        "type": "String",
+        "allowedValues": [
+          "Audit",
+          "Deny",
+          "Disabled"
+        ],
+        "defaultValue": "Deny",
+        "metadata": {
+          "displayName": "Effect",
+          "description": "Enable or disable the execution of the policy"
+        }
+      }
+    },
+    "policyRule": {
+      "if": {
+        "allOf": [
+          {
+            "field": "type",
+            "equals": "Microsoft.HealthcareApis/workspaces"
+          },
+          {
+            "anyOf": [
+              {
+                "field": "Microsoft.HealthcareApis/workspaces/publicNetworkAccess",
+                "exists": "false"
+              },
+              {
+                "field": "Microsoft.HealthcareApis/workspaces/publicNetworkAccess",
+                "notEquals": "Disabled"
+              }
+            ]
+          }
+        ]
+      },
+      "then": {
+        "effect": "[parameters('effect')]"
+      }
+    }
+  }
+}

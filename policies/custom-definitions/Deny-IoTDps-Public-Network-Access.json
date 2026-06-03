@@ -1,0 +1,57 @@
+{
+  "name": "Deny-IoTDps-Public-Network-Access",
+  "type": "Microsoft.Authorization/policyDefinitions",
+  "apiVersion": "2021-06-01",
+  "scope": null,
+  "properties": {
+    "policyType": "Custom",
+    "mode": "All",
+    "displayName": "IoT Hub Device Provisioning Service should disable public network access",
+    "description": "Disabling public network access improves security by ensuring that the IoT Hub Device Provisioning Service instance is not exposed on the public internet. Creating private endpoints can limit exposure of the DPS instance. Learn more at: https://aka.ms/iotdpsvnet.",
+    "metadata": {
+      "version": "1.0.0",
+      "category": "Internet of Things",
+      "source": "https://github.com/bbabcock1990/Deny-All-Azure-PaaS"
+    },
+    "parameters": {
+      "effect": {
+        "type": "String",
+        "allowedValues": [
+          "Audit",
+          "Deny",
+          "Disabled"
+        ],
+        "defaultValue": "Deny",
+        "metadata": {
+          "displayName": "Effect",
+          "description": "Enable or disable the execution of the policy"
+        }
+      }
+    },
+    "policyRule": {
+      "if": {
+        "allOf": [
+          {
+            "field": "type",
+            "equals": "Microsoft.Devices/provisioningServices"
+          },
+          {
+            "anyOf": [
+              {
+                "field": "Microsoft.Devices/provisioningServices/publicNetworkAccess",
+                "exists": "false"
+              },
+              {
+                "field": "Microsoft.Devices/provisioningServices/publicNetworkAccess",
+                "notEquals": "Disabled"
+              }
+            ]
+          }
+        ]
+      },
+      "then": {
+        "effect": "[parameters('effect')]"
+      }
+    }
+  }
+}

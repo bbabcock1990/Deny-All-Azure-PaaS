@@ -1,0 +1,57 @@
+{
+  "name": "Deny-SignalR-Public-Network-Access",
+  "type": "Microsoft.Authorization/policyDefinitions",
+  "apiVersion": "2021-06-01",
+  "scope": null,
+  "properties": {
+    "policyType": "Custom",
+    "mode": "All",
+    "displayName": "Azure SignalR Service should disable public network access",
+    "description": "Disabling public network access improves security by ensuring that the Azure SignalR Service resource is not exposed on the public internet and can only be reached from a private endpoint. Learn more at: https://aka.ms/asrs/networkacls.",
+    "metadata": {
+      "version": "1.0.0",
+      "category": "SignalR",
+      "source": "https://github.com/bbabcock1990/Deny-All-Azure-PaaS"
+    },
+    "parameters": {
+      "effect": {
+        "type": "String",
+        "allowedValues": [
+          "Audit",
+          "Deny",
+          "Disabled"
+        ],
+        "defaultValue": "Deny",
+        "metadata": {
+          "displayName": "Effect",
+          "description": "Enable or disable the execution of the policy"
+        }
+      }
+    },
+    "policyRule": {
+      "if": {
+        "allOf": [
+          {
+            "field": "type",
+            "equals": "Microsoft.SignalRService/SignalR"
+          },
+          {
+            "anyOf": [
+              {
+                "field": "Microsoft.SignalRService/SignalR/publicNetworkAccess",
+                "exists": "false"
+              },
+              {
+                "field": "Microsoft.SignalRService/SignalR/publicNetworkAccess",
+                "notEquals": "Disabled"
+              }
+            ]
+          }
+        ]
+      },
+      "then": {
+        "effect": "[parameters('effect')]"
+      }
+    }
+  }
+}

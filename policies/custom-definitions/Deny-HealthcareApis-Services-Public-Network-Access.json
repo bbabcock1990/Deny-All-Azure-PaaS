@@ -1,0 +1,57 @@
+{
+  "name": "Deny-HealthcareApis-Services-Public-Network-Access",
+  "type": "Microsoft.Authorization/policyDefinitions",
+  "apiVersion": "2021-06-01",
+  "scope": null,
+  "properties": {
+    "policyType": "Custom",
+    "mode": "All",
+    "displayName": "Azure API for FHIR (HealthcareApis services) should disable public network access",
+    "description": "Disabling public network access improves security by ensuring that legacy Azure API for FHIR resources (Microsoft.HealthcareApis/services) are not exposed on the public internet and can only be reached from a private endpoint. Microsoft's built-in policy only audits for an approved private endpoint connection; this custom definition denies on the publicNetworkAccess field for stronger enforcement. Learn more at: https://aka.ms/fhir-privatelink.",
+    "metadata": {
+      "version": "1.0.0",
+      "category": "Healthcare APIs",
+      "source": "https://github.com/bbabcock1990/Deny-All-Azure-PaaS"
+    },
+    "parameters": {
+      "effect": {
+        "type": "String",
+        "allowedValues": [
+          "Audit",
+          "Deny",
+          "Disabled"
+        ],
+        "defaultValue": "Deny",
+        "metadata": {
+          "displayName": "Effect",
+          "description": "Enable or disable the execution of the policy"
+        }
+      }
+    },
+    "policyRule": {
+      "if": {
+        "allOf": [
+          {
+            "field": "type",
+            "equals": "Microsoft.HealthcareApis/services"
+          },
+          {
+            "anyOf": [
+              {
+                "field": "Microsoft.HealthcareApis/services/publicNetworkAccess",
+                "exists": "false"
+              },
+              {
+                "field": "Microsoft.HealthcareApis/services/publicNetworkAccess",
+                "notEquals": "Disabled"
+              }
+            ]
+          }
+        ]
+      },
+      "then": {
+        "effect": "[parameters('effect')]"
+      }
+    }
+  }
+}

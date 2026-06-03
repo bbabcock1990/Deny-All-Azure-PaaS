@@ -1,0 +1,57 @@
+{
+  "name": "Deny-Purview-Public-Network-Access",
+  "type": "Microsoft.Authorization/policyDefinitions",
+  "apiVersion": "2021-06-01",
+  "scope": null,
+  "properties": {
+    "policyType": "Custom",
+    "mode": "All",
+    "displayName": "Microsoft Purview accounts should disable public network access",
+    "description": "Disabling public network access improves security by ensuring that Microsoft Purview accounts are not exposed on the public internet and can only be reached from a private endpoint. Microsoft's built-in policy only audits for an approved private endpoint connection; this custom definition denies on the publicNetworkAccess field for stronger enforcement. Learn more at: https://aka.ms/purview-private-link.",
+    "metadata": {
+      "version": "1.0.0",
+      "category": "Azure Purview",
+      "source": "https://github.com/bbabcock1990/Deny-All-Azure-PaaS"
+    },
+    "parameters": {
+      "effect": {
+        "type": "String",
+        "allowedValues": [
+          "Audit",
+          "Deny",
+          "Disabled"
+        ],
+        "defaultValue": "Deny",
+        "metadata": {
+          "displayName": "Effect",
+          "description": "Enable or disable the execution of the policy"
+        }
+      }
+    },
+    "policyRule": {
+      "if": {
+        "allOf": [
+          {
+            "field": "type",
+            "equals": "Microsoft.Purview/accounts"
+          },
+          {
+            "anyOf": [
+              {
+                "field": "Microsoft.Purview/accounts/publicNetworkAccess",
+                "exists": "false"
+              },
+              {
+                "field": "Microsoft.Purview/accounts/publicNetworkAccess",
+                "notEquals": "Disabled"
+              }
+            ]
+          }
+        ]
+      },
+      "then": {
+        "effect": "[parameters('effect')]"
+      }
+    }
+  }
+}
