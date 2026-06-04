@@ -2,12 +2,13 @@
 management_group_id = "mg-demo-group"
 
 # Optional naming overrides
-# custom_policy_definition_name = "Deny-LogicApp-Public-Network"
-# initiative_name               = "Deny-PublicPaaSEndpoints"
-# assignment_name               = "alz-deny-public-paas"   # max 24 chars
-# assignment_display_name       = "Enforce private endpoints across PaaS services (ALZ)"
+# logic_app_policy_definition_name      = "Deny-LogicApp-Public-Network"
+# custom_policy_definition_name_prefix  = ""                              # e.g. "contoso-"
+# initiative_name                       = "Deny-PublicPaaSEndpoints"
+# assignment_name                       = "deny-all-public-paas"          # max 24 chars
+# assignment_display_name               = "Enforce private endpoints across all PaaS services (62)"
 
 # Optional behaviour
 # non_compliance_message     = "Private Endpoints Must Be Enabled - No Public Access"
-# override_effects_globally  = false
-# effect                     = "Deny"   # Audit | Deny | Disabled (only used if override = true)
+# override_effects_globally  = false           # true => apply `effect` to all 62 policies
+# effect                     = "Deny"          # Audit | Deny | Disabled

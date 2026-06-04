@@ -1,13 +1,13 @@
 # Deny-All-Azure-PaaS
 
-> Deploy the Azure Landing Zones **`Deny-PublicPaaSEndpoints`** initiative — plus an **optional supplemental initiative covering 17 additional services** — with a custom deny message, using either **Bicep** or **Terraform**.
+> One combined Azure Policy initiative that **denies the creation of 62 Azure PaaS resources** unless their `publicNetworkAccess` is set to `Disabled` (so the resource is only reachable through a Private Endpoint). Ships with a custom deny message and is deployable via **Bicep** or **Terraform**.
 
-When applied to a management group, this control **denies the creation of up to 62 different Azure PaaS resources** unless their `publicNetworkAccess` property is set to `Disabled` (i.e., the resource is reachable only through a Private Endpoint):
+When applied to a management group, this control blocks creation of:
 
-- **ALZ initiative (45 services)** — `bicep/main.bicep` / `terraform/main.tf` — Storage, SQL, Cosmos, Key Vault, App Service, Function App, Logic Apps, Container Registry, AKS, Cognitive Services, Service Bus, Event Hub, Event Grid, AI Search, Synapse, ADF, ADX, AVD, and more.
-- **Supplemental initiative (17 services)** — `bicep/supplemental.bicep` / `terraform/supplemental/` — SignalR, Web PubSub, IoT Hub, IoT DPS, Purview, Health Data Services (workspace + FHIR + DICOM + legacy FHIR), Static Web Apps, Relay, HDInsight, Communication Services, Digital Twins, AI Video Indexer, Log Analytics workspaces, Application Insights.
+- **45 services from the Azure Landing Zones `Deny-PublicPaaSEndpoints` initiative** — Storage, SQL, Cosmos, Key Vault, App Service, Function App, Logic Apps, Container Registry, AKS, Cognitive Services, Service Bus, Event Hub, Event Grid, AI Search, Synapse, ADF, ADX, AVD, and many more (44 Microsoft built-ins + 1 ALZ-shipped custom for Logic Apps).
+- **17 supplemental services covered by custom policies in this repo** — SignalR, Web PubSub, IoT Hub, IoT DPS, Purview, Health Data Services (workspace + FHIR + DICOM + legacy FHIR), Static Web Apps, Relay, HDInsight, Communication Services, Digital Twins, AI Video Indexer, Log Analytics workspaces, Application Insights.
 
-Anyone whose deployment is blocked sees the message:
+All 62 services are bundled into **one initiative**, deployed with **one wrapper** (Bicep or Terraform) and assigned **once** at your management group. Anyone whose deployment is blocked sees:
 
 > **Private Endpoints Must Be Enabled - No Public Access**
 
@@ -24,8 +24,7 @@ Anyone whose deployment is blocked sees the message:
 - [Quickstart — Terraform](#quickstart--terraform)
 - [Customisation](#customisation)
 - [Verifying the deployment](#verifying-the-deployment)
-- [What's blocked — ALZ initiative (45 services)](#whats-blocked--alz-initiative-45-services)
-- [What's blocked — Supplemental initiative (17 services)](#whats-blocked--supplemental-initiative-17-services)
+- [What's blocked (62 services)](#whats-blocked-62-services)
 - [Adding new resource types in the future](#adding-new-resource-types-in-the-future)
 - [Upgrading](#upgrading)
 - [Troubleshooting](#troubleshooting)
@@ -36,19 +35,20 @@ Anyone whose deployment is blocked sees the message:
 
 ## How it works
 
-The repo ships **two independent initiatives**, each with its own Bicep and Terraform deployment. You can deploy one, the other, or both.
+The repo ships **one combined initiative** that bundles 62 policy references:
+- **44** Microsoft built-in policies (referenced by URL — no deployment needed).
+- **1** custom ALZ policy for Logic Apps (`Deny-LogicApp-Public-Network`), deployed from `policies/policy_definitions/`.
+- **17** custom supplemental policies for gap services, deployed from `policies/custom-definitions/`.
 
-**1. ALZ initiative** (`bicep/main.bicep` / `terraform/main.tf`)
-- Ships the **ALZ `Deny-PublicPaaSEndpoints` initiative JSON** plus its **one** custom policy dependency (`Deny-LogicApp-Public-Network`) — both pulled verbatim from [`Azure/ALZ-Bicep`](https://github.com/Azure/ALZ-Bicep).
-- Deploys the custom Logic App policy + the initiative (44 built-ins + 1 custom) at your management group.
-- 45 PaaS services covered, mostly via Microsoft built-in policies (no extra definitions to maintain).
+For services where Microsoft only ships an audit-only built-in (e.g. Purview, Health Data Services), this repo's custom version is **stronger** — it denies on `publicNetworkAccess` directly rather than checking after the fact for an approved private endpoint connection.
 
-**2. Supplemental initiative** (`bicep/supplemental.bicep` / `terraform/supplemental/`)
-- Bundles **17 custom policy definitions** authored in this repo, covering PaaS services that are missing from (or only partially covered by) ALZ.
-- The definitions live in `policies/custom-definitions/`. Each is a small JSON file following a single template — easy to read, easy to extend.
-- For services where Microsoft only ships an audit-only built-in (e.g. Purview, Health Data Services), the custom version is **stronger** — it denies on `publicNetworkAccess` directly rather than checking after the fact for an approved private endpoint connection.
+The Bicep and Terraform wrappers do the same five things:
 
-Both deployments produce **one** policy assignment carrying your custom non-compliance message — replicated per bundled policy reference, which is what Azure requires for an initiative-level assignment to actually surface the deny message to the caller.
+1. Load the combined initiative JSON (`policies/policy_set_definition.json`).
+2. Deploy the **18 custom policy definitions** (1 ALZ + 17 supplemental).
+3. Rewrite the initiative's `policyDefinitionId` URLs so each reference points at the actual deployed custom definitions (built-in URLs pass through untouched).
+4. Deploy the combined initiative as one custom policy set at the target management group.
+5. Create one policy assignment carrying your custom non-compliance message — **replicated per bundled policy reference**, which is what Azure requires for an initiative-level assignment to actually surface the deny message to the caller.
 
 ---
 
@@ -56,34 +56,26 @@ Both deployments produce **one** policy assignment carrying your custom non-comp
 
 ```
 .
-├── policies/                                              ← source-of-truth JSON (shared by both implementations)
-│   ├── policy_set_definition_es_Deny-PublicPaaSEndpoints.json   ← ALZ initiative (verbatim from upstream)
-│   ├── policy_set_definition_supplemental.json                  ← supplemental initiative (this repo)
-│   ├── policy_definitions/                                ← ALZ-derived custom dependencies (verbatim)
+├── policies/                                                ← source-of-truth JSON
+│   ├── policy_set_definition.json                           ← combined initiative (62 refs, 46 params)
+│   ├── policy_definitions/                                  ← ALZ-derived custom dependencies (verbatim)
 │   │   └── policy_definition_es_Deny-LogicApp-Public-Network.json
-│   └── custom-definitions/                                ← gap-coverage custom definitions (this repo)
-│       ├── README.md                                      ← authoring template + alias guidance
-│       └── Deny-*.json                                    ← 17 files, one per gap service
+│   └── custom-definitions/                                  ← supplemental custom definitions (this repo)
+│       ├── README.md                                        ← authoring template + alias guidance
+│       └── Deny-*.json                                      ← 17 files, one per gap service
 ├── bicep/
-│   ├── main.bicep                                         ← ALZ initiative wrapper
-│   └── supplemental.bicep                                 ← supplemental initiative wrapper
+│   └── main.bicep                                           ← Bicep wrapper
 ├── terraform/
-│   ├── providers.tf                                       ← ALZ initiative module
+│   ├── providers.tf
 │   ├── variables.tf
 │   ├── main.tf
 │   ├── outputs.tf
-│   ├── terraform.tfvars.example
-│   └── supplemental/                                      ← supplemental initiative module (separate root)
-│       ├── providers.tf
-│       ├── variables.tf
-│       ├── main.tf
-│       ├── outputs.tf
-│       └── terraform.tfvars.example
+│   └── terraform.tfvars.example
 ├── LICENSE
 └── README.md
 ```
 
-Both Bicep files and both Terraform modules read JSON from `../policies/` (or `../../policies/` for the supplemental Terraform module) — keep the folder structure intact when you clone.
+The Bicep file and the Terraform module both read JSON from `../policies/` — keep the folder structure intact when you clone.
 
 ---
 
@@ -134,30 +126,13 @@ az deployment mg create \
   --location eastus \
   --template-file ./bicep/main.bicep \
   --parameters \
-      assignmentName=my-pe-policy \
       initiativeName=MyOrg-Deny-PaaS-Public \
-      customPolicyDefinitionName=MyOrg-Deny-LogicApp-Public \
-      nonComplianceMessage="Your message here"
+      assignmentName=my-pe-policy \
+      logicAppPolicyDefinitionName=MyOrg-Deny-LogicApp-Public \
+      customPolicyDefinitionNamePrefix=myorg- \
+      nonComplianceMessage="Your message here" \
+      effect=Audit
 ```
-
-### Deploy the supplemental initiative (optional — 17 more services)
-
-```bash
-# What-if
-az deployment mg what-if \
-  --management-group-id <your-mg-id> \
-  --location eastus \
-  --template-file ./bicep/supplemental.bicep
-
-# Deploy
-az deployment mg create \
-  --name deploy-deny-paas-supplemental \
-  --management-group-id <your-mg-id> \
-  --location eastus \
-  --template-file ./bicep/supplemental.bicep
-```
-
-Same naming overrides apply (`assignmentName`, `initiativeName`, `customPolicyDefinitionNamePrefix`, `nonComplianceMessage`, `effect`).
 
 ---
 
@@ -184,23 +159,6 @@ terraform apply
 
 `terraform.tfvars` accepts the same naming/behaviour overrides as the Bicep parameters (see [Customisation](#customisation)).
 
-### Deploy the supplemental initiative (optional — 17 more services)
-
-The supplemental Terraform module is a **separate root** under `terraform/supplemental/` so its state is isolated from the ALZ deployment.
-
-```bash
-cd Deny-All-Azure-PaaS/terraform/supplemental
-
-cp terraform.tfvars.example terraform.tfvars
-#   ...edit terraform.tfvars and set management_group_id = "<your-mg-id>"
-
-terraform init
-terraform plan
-terraform apply
-```
-
-The supplemental module accepts the same shape of overrides as the ALZ one (assignment name, initiative name, custom-definition name prefix, deny message, effect).
-
 ---
 
 ## Customisation
@@ -211,20 +169,21 @@ Both implementations expose the **same** knobs. Defaults are sensible — change
 
 | Bicep parameter | Terraform variable | Default | What it names |
 |---|---|---|---|
-| `customPolicyDefinitionName` | `custom_policy_definition_name` | `Deny-LogicApp-Public-Network` | The one custom policy definition |
-| `initiativeName` | `initiative_name` | `Deny-PublicPaaSEndpoints` | The policy set (initiative) |
-| `assignmentName` | `assignment_name` | `alz-deny-public-paas` | The policy assignment (**max 24 chars** — Azure limit, enforced at compile/plan time) |
-| `assignmentDisplayName` | `assignment_display_name` | `Enforce private endpoints across PaaS services (ALZ)` | Friendly name in the portal |
+| `logicAppPolicyDefinitionName` | `logic_app_policy_definition_name` | `Deny-LogicApp-Public-Network` | The ALZ-derived Logic App custom policy definition |
+| `customPolicyDefinitionNamePrefix` | `custom_policy_definition_name_prefix` | *(empty)* | Prefix prepended to every supplemental custom policy name (e.g. `contoso-`). The initiative's lookup keys off the original name, so renames flow through automatically. |
+| `initiativeName` | `initiative_name` | `Deny-PublicPaaSEndpoints` | The combined policy set (initiative) |
+| `assignmentName` | `assignment_name` | `deny-all-public-paas` | The policy assignment (**max 24 chars** — Azure limit, enforced at compile/plan time) |
+| `assignmentDisplayName` | `assignment_display_name` | `Enforce private endpoints across all PaaS services (62)` | Friendly name in the portal |
 
 ### Behaviour
 
 | Bicep parameter | Terraform variable | Default | What it does |
 |---|---|---|---|
 | `nonComplianceMessage` | `non_compliance_message` | `Private Endpoints Must Be Enabled - No Public Access` | Custom message shown to the caller when a deploy is denied |
-| `overrideEffectsGlobally` | `override_effects_globally` | `false` | If `true`, forces every bundled policy parameter to `effect`. If `false`, respects ALZ defaults (43 of 45 already default to `Deny`) |
-| `effect` | `effect` | `Deny` | Only consulted when `overrideEffectsGlobally = true`. One of: `Audit`, `Deny`, `Disabled` |
+| `effect` | `effect` | `Deny` | Effect applied to the **17 supplemental** policies always, and to **all 62** policies when `overrideEffectsGlobally = true`. One of: `Audit`, `Deny`, `Disabled` |
+| `overrideEffectsGlobally` | `override_effects_globally` | `false` | If `true`, forces every initiative parameter to `effect`. If `false`, the 17 supplemental policies use `effect` and the 45 ALZ ones fall back to ALZ defaults (43 of 45 already default to `Deny`) |
 
-> ⚠️ **About `overrideEffectsGlobally = true`** — 2 of the 45 bundled policies have allowed-value lists that don't include `Deny` (they default to `Audit` or `AuditIfNotExists` because their underlying control can't deny at create-time). Forcing them to `Deny` may fail validation. The safe default is `false` — the ALZ per-policy defaults are already mostly `Deny`.
+> ⚠️ **About `overrideEffectsGlobally = true`** — 2 of the 45 ALZ-bundled policies have allowed-value lists that don't include `Deny` (they default to `Audit` or `AuditIfNotExists` because their underlying control can't deny at create-time). Forcing them to `Deny` may fail validation. The safe default is `false` — those two stay at `Audit`, and everything else is `Deny`.
 
 ### Audit-first dry run (recommended)
 
@@ -246,7 +205,7 @@ terraform apply
 
 ```bash
 MG=<your-mg-id>
-ASSIGN=alz-deny-public-paas     # or whatever you set as assignment name
+ASSIGN=deny-all-public-paas     # or whatever you set as assignment name
 
 # Show the assignment
 az policy assignment show \
@@ -261,6 +220,12 @@ az policy assignment show \
   --query "nonComplianceMessages[0].message" -o tsv
 # → Private Endpoints Must Be Enabled - No Public Access
 
+# Count bundled references (should be 62)
+az policy set-definition show \
+  --name Deny-PublicPaaSEndpoints \
+  --management-group $MG \
+  --query "length(policyDefinitions)" -o tsv
+
 # (Optional) try to create a non-compliant storage account — should be denied
 az storage account create \
   -n stpetest$RANDOM -g <some-rg> -l eastus --sku Standard_LRS
@@ -269,21 +234,21 @@ az storage account create \
 
 ---
 
-## What's blocked — ALZ initiative (45 services)
+## What's blocked (62 services)
 
-All 45 references inside the ALZ initiative, sorted by reference ID. **44** are Microsoft built-ins; **1** is the ALZ-custom Logic App policy shipped in this repo.
+All 62 references bundled inside the combined initiative. Sources: **44** Microsoft built-ins, **1** ALZ-custom (Logic App), **17** supplemental customs from this repo.
 
-| # | Reference ID inside the initiative | Service / Resource type | Source |
+| # | Reference ID | Service / Resource type | Source |
 |---|---|---|---|
-| 1 | `ACRDenyPaasPublicIP` | Azure Container Registry | Built-in |
-| 2 | `AFSDenyPaasPublicIP` | Azure File Sync | Built-in |
-| 3 | `AKSDenyPaasPublicIP` | Azure Kubernetes Service | Built-in |
-| 4 | `ApiManDenyPublicIP` | API Management | Built-in |
-| 5 | `AppConfigDenyPublicIP` | App Configuration | Built-in |
-| 6 | `AsDenyPublicIP` | App Service | Built-in |
-| 7 | `AseDenyPublicIP` | App Service Environment | Built-in |
-| 8 | `AsrVaultDenyPublicIP` | Azure Site Recovery vault | Built-in |
-| 9 | `AutomationDenyPublicIP` | Automation Account | Built-in |
+| 1  | `ACRDenyPaasPublicIP` | Azure Container Registry | Built-in |
+| 2  | `AFSDenyPaasPublicIP` | Azure File Sync | Built-in |
+| 3  | `AKSDenyPaasPublicIP` | Azure Kubernetes Service | Built-in |
+| 4  | `ApiManDenyPublicIP` | API Management | Built-in |
+| 5  | `AppConfigDenyPublicIP` | App Configuration | Built-in |
+| 6  | `AsDenyPublicIP` | App Service | Built-in |
+| 7  | `AseDenyPublicIP` | App Service Environment | Built-in |
+| 8  | `AsrVaultDenyPublicIP` | Azure Site Recovery vault | Built-in |
+| 9  | `AutomationDenyPublicIP` | Automation Account | Built-in |
 | 10 | `BatchDenyPublicIP` | Batch Account | Built-in |
 | 11 | `BotServiceDenyPublicIP` | Bot Service | Built-in |
 | 12 | `ContainerAppsEnvironmentDenyPublicIP` | Container Apps Environment | Built-in |
@@ -320,36 +285,27 @@ All 45 references inside the ALZ initiative, sorted by reference ID. **44** are 
 | 43 | `RedisCacheDenyPublicIP` | Azure Cache for Redis | Built-in |
 | 44 | `SqlServerDenyPaasPublicIP` | Azure SQL Server | Built-in |
 | 45 | `StorageDenyPaasPublicIP` | Storage Account (network ACLs) | Built-in |
-
----
-
-## What's blocked — Supplemental initiative (17 services)
-
-The supplemental initiative (`bicep/supplemental.bicep` / `terraform/supplemental/`) bundles **17 custom policy definitions** authored in this repo, all living in `policies/custom-definitions/`. Default effect: `Deny`.
-
-| # | Reference ID | Service / Resource type | Field checked |
-|---|---|---|---|
-| 1 | `Deny-SignalR-Public-Network-Access` | Azure SignalR Service (`Microsoft.SignalRService/SignalR`) | `publicNetworkAccess` |
-| 2 | `Deny-WebPubSub-Public-Network-Access` | Azure Web PubSub (`Microsoft.SignalRService/webPubSub`) | `publicNetworkAccess` |
-| 3 | `Deny-IoTHub-Public-Network-Access` | Azure IoT Hub (`Microsoft.Devices/IotHubs`) | `publicNetworkAccess` |
-| 4 | `Deny-IoTDps-Public-Network-Access` | IoT Hub Device Provisioning Service (`Microsoft.Devices/provisioningServices`) | `publicNetworkAccess` |
-| 5 | `Deny-Purview-Public-Network-Access` | Microsoft Purview (`Microsoft.Purview/accounts`) | `publicNetworkAccess` |
-| 6 | `Deny-HealthcareApis-Services-Public-Network-Access` | Legacy Azure API for FHIR (`Microsoft.HealthcareApis/services`) | `publicNetworkAccess` |
-| 7 | `Deny-HealthDataServices-Workspace-Public-Network-Access` | Health Data Services workspace (`Microsoft.HealthcareApis/workspaces`) | `publicNetworkAccess` |
-| 8 | `Deny-HealthDataServices-FHIR-Public-Network-Access` | Health Data Services FHIR (`.../workspaces/fhirservices`) | `publicNetworkAccess` |
-| 9 | `Deny-HealthDataServices-DICOM-Public-Network-Access` | Health Data Services DICOM (`.../workspaces/dicomservices`) | `publicNetworkAccess` |
-| 10 | `Deny-StaticWebApps-Public-Network-Access` | Azure Static Web Apps (`Microsoft.Web/staticSites`) | `publicNetworkAccess` |
-| 11 | `Deny-Relay-Public-Network-Access` | Azure Relay (`Microsoft.Relay/namespaces`) | `publicNetworkAccess` |
-| 12 | `Deny-HDInsight-Public-Network-Access` | Azure HDInsight (`Microsoft.HDInsight/clusters`) | `networkProperties.privateLink` must be `Enabled` |
-| 13 | `Deny-CommunicationServices-Public-Network-Access` | Azure Communication Services (`Microsoft.Communication/communicationServices`) | `publicNetworkAccess` |
-| 14 | `Deny-DigitalTwins-Public-Network-Access` | Azure Digital Twins (`Microsoft.DigitalTwins/digitalTwinsInstances`) | `publicNetworkAccess` (Preview) |
-| 15 | `Deny-VideoIndexer-Public-Network-Access` | Azure AI Video Indexer (`Microsoft.VideoIndexer/accounts`) | `publicNetworkAccess` |
-| 16 | `Deny-LogAnalytics-Public-Network-Access` | Log Analytics workspaces (`Microsoft.OperationalInsights/workspaces`) | both `publicNetworkAccessForIngestion` and `...ForQuery` |
-| 17 | `Deny-AppInsights-Public-Network-Access` | Application Insights (`Microsoft.Insights/components`) | both `publicNetworkAccessForIngestion` and `...ForQuery` |
+| 46 | `Deny-SignalR-Public-Network-Access` | Azure SignalR Service | **Custom (this repo)** |
+| 47 | `Deny-WebPubSub-Public-Network-Access` | Azure Web PubSub | **Custom (this repo)** |
+| 48 | `Deny-IoTHub-Public-Network-Access` | Azure IoT Hub | **Custom (this repo)** |
+| 49 | `Deny-IoTDps-Public-Network-Access` | IoT Hub Device Provisioning Service | **Custom (this repo)** |
+| 50 | `Deny-Purview-Public-Network-Access` | Microsoft Purview | **Custom (this repo)** |
+| 51 | `Deny-HealthcareApis-Services-Public-Network-Access` | Legacy Azure API for FHIR | **Custom (this repo)** |
+| 52 | `Deny-HealthDataServices-Workspace-Public-Network-Access` | Health Data Services workspace | **Custom (this repo)** |
+| 53 | `Deny-HealthDataServices-FHIR-Public-Network-Access` | Health Data Services FHIR | **Custom (this repo)** |
+| 54 | `Deny-HealthDataServices-DICOM-Public-Network-Access` | Health Data Services DICOM | **Custom (this repo)** |
+| 55 | `Deny-StaticWebApps-Public-Network-Access` | Azure Static Web Apps | **Custom (this repo)** |
+| 56 | `Deny-Relay-Public-Network-Access` | Azure Relay | **Custom (this repo)** |
+| 57 | `Deny-HDInsight-Public-Network-Access` | Azure HDInsight (checks `networkProperties.privateLink`) | **Custom (this repo)** |
+| 58 | `Deny-CommunicationServices-Public-Network-Access` | Azure Communication Services | **Custom (this repo)** |
+| 59 | `Deny-DigitalTwins-Public-Network-Access` | Azure Digital Twins (Preview) | **Custom (this repo)** |
+| 60 | `Deny-VideoIndexer-Public-Network-Access` | Azure AI Video Indexer | **Custom (this repo)** |
+| 61 | `Deny-LogAnalytics-Public-Network-Access` | Log Analytics workspaces (both `...ForIngestion` and `...ForQuery`) | **Custom (this repo)** |
+| 62 | `Deny-AppInsights-Public-Network-Access` | Application Insights (both `...ForIngestion` and `...ForQuery`) | **Custom (this repo)** |
 
 ### Why custom instead of Microsoft built-ins?
 
-For each service in this list, one of the following is true:
+For each of the 17 supplemental services, one of the following is true:
 1. **No built-in `Deny` policy exists** at all (e.g., Communication Services, Digital Twins, Video Indexer).
 2. **Microsoft's built-in is audit-only** — it checks for an approved private endpoint connection rather than the `publicNetworkAccess` field. Our custom version denies on the field directly, which is stronger (Purview, Health Data Services).
 3. **A built-in exists but defaults to `Audit`** and we want a `Deny` default with our standard non-compliance message.
@@ -362,46 +318,39 @@ See `policies/custom-definitions/README.md` for the authoring template and detai
 
 There are three ways to extend the coverage, listed from simplest to most invasive.
 
-### Option A — Wait for ALZ to add it (recommended)
+### Option A — Pull in upstream ALZ updates
 
-Microsoft updates the [`Azure/ALZ-Bicep`](https://github.com/Azure/ALZ-Bicep) repo as new PaaS services support `publicNetworkAccess`. To pick up their updates:
+Microsoft updates the [`Azure/ALZ-Bicep`](https://github.com/Azure/ALZ-Bicep) repo as new PaaS services support `publicNetworkAccess`. To pick up their additions:
 
-```bash
-cd Deny-All-Azure-PaaS
+1. Fetch the latest ALZ initiative JSON:
+   ```bash
+   curl -L -o /tmp/alz.json \
+     https://raw.githubusercontent.com/Azure/ALZ-Bicep/main/infra-as-code/bicep/modules/policy/definitions/lib/policy_set_definitions/policy_set_definition_es_Deny-PublicPaaSEndpoints.json
+   ```
+2. Merge any **new** `policyDefinitions[]` entries and matching `parameters{}` from `/tmp/alz.json` into this repo's `policies/policy_set_definition.json`. Leave the 17 supplemental entries (`Deny-…-Public-Network-Access` at the end of the array) alone.
+3. If a new entry references **another** ALZ-custom (non-built-in) policy, also fetch its JSON into `policies/policy_definitions/` and add a matching `resource` in `bicep/main.bicep`. The Terraform side picks it up automatically once you extend the `endswith()` substitution (or add a new branch alongside the Logic App one).
+4. Redeploy.
 
-# Pull the two latest JSON files into ./policies/
-curl -L -o policies/policy_set_definition_es_Deny-PublicPaaSEndpoints.json \
-  https://raw.githubusercontent.com/Azure/ALZ-Bicep/main/infra-as-code/bicep/modules/policy/definitions/lib/policy_set_definitions/policy_set_definition_es_Deny-PublicPaaSEndpoints.json
+### Option B — Add a Microsoft built-in policy reference
 
-curl -L -o policies/policy_definitions/policy_definition_es_Deny-LogicApp-Public-Network.json \
-  https://raw.githubusercontent.com/Azure/ALZ-Bicep/main/infra-as-code/bicep/modules/policy/definitions/lib/policy_definitions/policy_definition_es_Deny-LogicApp-Public-Network.json
+If Microsoft ships a built-in `Deny` policy for a new service before this repo picks it up:
 
-# Redeploy via Bicep or Terraform
-```
-
-> If a future ALZ release adds **another** custom (non-built-in) policy dependency, you'll need to:
-> - Place its `.json` next to the Logic App one in `policies/policy_definitions/`.
-> - Add a matching block in `bicep/main.bicep` (`resource 'Microsoft.Authorization/policyDefinitions@2023-04-01' = { ... }`) and update the `endsWith` substitution to recognise its suffix.
-> - Add a matching `azurerm_policy_definition` resource in `terraform/main.tf` and update the `endswith()` substitution likewise.
-
-### Option B — Add a new built-in policy reference yourself
-
-If Microsoft ships a *built-in* policy for a new service before ALZ picks it up:
-
-1. Find the policy's GUID — `az policy definition list --query "[?contains(displayName,'should disable public network access')].{name:name,display:displayName}" -o table`
-2. Open `policies/policy_set_definition_es_Deny-PublicPaaSEndpoints.json` and add an entry to `properties.policyDefinitions`:
+1. Find the policy's GUID:
+   ```bash
+   az policy definition list \
+     --query "[?contains(displayName,'should disable public network access')].{name:name,display:displayName}" -o table
+   ```
+2. Add an entry to `properties.policyDefinitions` in `policies/policy_set_definition.json`:
    ```json
    {
      "policyDefinitionReferenceId": "MyNewServiceDeny",
      "policyDefinitionId": "/providers/Microsoft.Authorization/policyDefinitions/<GUID-HERE>",
-     "parameters": {
-       "effect": { "value": "[[parameters('myNewServiceEffect')]" }
-     },
+     "parameters": { "effect": { "value": "[[parameters('myNewServiceEffect')]" } },
      "groupNames": [],
      "definitionVersion": "1.*.*"
    }
    ```
-3. Add the matching parameter to `properties.parameters` in the same file:
+3. Add a matching parameter to `properties.parameters` in the same file:
    ```json
    "myNewServiceEffect": {
      "type": "String",
@@ -410,15 +359,15 @@ If Microsoft ships a *built-in* policy for a new service before ALZ picks it up:
      "metadata": { "displayName": "My new service effect", "description": "..." }
    }
    ```
-4. Redeploy. The wrapper picks up the new entry automatically — no Bicep/Terraform edits required.
+4. Redeploy. Both Bicep and Terraform pick the new entry up — no wrapper edits required.
 
 ### Option C — Author a brand-new custom policy (recommended for gap services)
 
-When neither ALZ nor Microsoft has shipped a built-in Deny policy yet, **add it to the supplemental initiative** — much simpler than touching the ALZ wrapper.
+When neither ALZ nor Microsoft has shipped a built-in Deny policy yet, **add it to the supplemental custom definitions**:
 
 1. **Create the policy JSON.** Drop a new `Deny-<Service>-Public-Network-Access.json` into `policies/custom-definitions/`. Use the template in `policies/custom-definitions/README.md` — most services just need their ARM type, the alias for `publicNetworkAccess`, and a friendly display name.
 
-2. **Reference it in the supplemental initiative.** Open `policies/policy_set_definition_supplemental.json` and add an entry to `properties.policyDefinitions`:
+2. **Reference it in the combined initiative.** Open `policies/policy_set_definition.json` and add an entry to `properties.policyDefinitions`:
    ```json
    {
      "policyDefinitionReferenceId": "Deny-MyNewService-Public-Network-Access",
@@ -427,21 +376,21 @@ When neither ALZ nor Microsoft has shipped a built-in Deny policy yet, **add it 
      "groupNames": []
    }
    ```
-   The `policyDefinitionReferenceId` **must equal** the `name` field inside your new JSON file — that's the lookup key both wrappers use.
+   The `policyDefinitionReferenceId` **must equal** the `name` field inside your new JSON file — that's the lookup key both wrappers use to rewrite the URL.
 
-3. **(Bicep only)** Add one line to `bicep/supplemental.bicep` — `loadJsonContent('../policies/custom-definitions/Deny-MyNewService-Public-Network-Access.json')` — inside the `customDefs` array. Bicep needs literal paths, so the list is explicit.
+3. **Bicep only:** add one line to `bicep/main.bicep` — `loadJsonContent('../policies/custom-definitions/Deny-MyNewService-Public-Network-Access.json')` — inside the `supplementalCustomDefs` array. Bicep needs literal paths, so the list is explicit.
 
    **Terraform requires no edits.** The `fileset()` glob picks up every `Deny-*.json` in `custom-definitions/` automatically.
 
 4. Redeploy:
    ```bash
    # Bicep
-   az deployment mg create --name deploy-deny-paas-supplemental \
+   az deployment mg create --name deploy-deny-all-paas \
      --management-group-id <your-mg-id> --location eastus \
-     --template-file ./bicep/supplemental.bicep
+     --template-file ./bicep/main.bicep
 
    # Terraform
-   cd terraform/supplemental && terraform apply
+   cd terraform && terraform apply
    ```
 
 > When in doubt about the alias for `publicNetworkAccess` on a given resource type, verify with:
@@ -458,24 +407,16 @@ When neither ALZ nor Microsoft has shipped a built-in Deny policy yet, **add it 
 cd Deny-All-Azure-PaaS
 git pull
 
-# Bicep — ALZ initiative
+# Bicep
 az deployment mg create --name deploy-deny-all-paas \
   --management-group-id <your-mg-id> --location eastus \
   --template-file ./bicep/main.bicep
 
-# Bicep — Supplemental initiative
-az deployment mg create --name deploy-deny-paas-supplemental \
-  --management-group-id <your-mg-id> --location eastus \
-  --template-file ./bicep/supplemental.bicep
-
-# Terraform — ALZ initiative
+# Terraform
 cd terraform && terraform apply
-
-# Terraform — Supplemental initiative
-cd ../terraform/supplemental && terraform apply
 ```
 
-All four deployments are idempotent — re-running won't recreate unchanged resources.
+Both implementations are idempotent — re-running won't recreate unchanged resources.
 
 ---
 
@@ -490,12 +431,17 @@ All four deployments are idempotent — re-running won't recreate unchanged reso
 | Deny works but the message isn't shown to the caller | Confirm the assignment was created with `nonComplianceMessages` populated — `az policy assignment show … --query nonComplianceMessages`. The wrapper emits **one entry per bundled policy** because Azure requires that for an initiative-level deny message. |
 | Terraform: `endswith` is not a defined function | Upgrade Terraform to ≥ 1.5.0. |
 | Terraform: `policy_definition_reference` block doesn't accept `version` | Upgrade the AzureRM provider to ≥ 3.80.0. |
+| One of the 17 supplemental policies fails with `The alias '…' is not defined` | The ARM alias for that resource's `publicNetworkAccess` may have changed or doesn't exist. Verify with `az provider show --namespace Microsoft.<Provider> --expand "resourceTypes/aliases"` and edit the corresponding `policies/custom-definitions/Deny-*.json`. |
 
 ---
 
 ## Attribution
 
-The two JSON files under `policies/` are taken **verbatim** from [`Azure/ALZ-Bicep`](https://github.com/Azure/ALZ-Bicep), published by Microsoft under the MIT License. This repository preserves that license and adds the Bicep + Terraform wrappers around them.
+The combined initiative in `policies/policy_set_definition.json` is built from two sources:
+- 45 references (44 built-ins + the Logic App custom in `policies/policy_definitions/`) come from [`Azure/ALZ-Bicep`](https://github.com/Azure/ALZ-Bicep), published by Microsoft under the MIT License.
+- 17 references (the custom definitions in `policies/custom-definitions/`) are authored in this repository.
+
+This repository preserves the MIT License and adds the Bicep + Terraform wrappers around the combined initiative.
 
 ## License
 

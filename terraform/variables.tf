@@ -9,22 +9,28 @@ variable "management_group_id" {
 # ---------------------------------------------------------------------------
 # Naming (override these to match your org's standards)
 # ---------------------------------------------------------------------------
-variable "custom_policy_definition_name" {
+variable "logic_app_policy_definition_name" {
   type        = string
-  description = "Name of the custom Logic App policy definition (the one ALZ-custom dependency)."
+  description = "Name of the custom ALZ Logic App policy definition."
   default     = "Deny-LogicApp-Public-Network"
+}
+
+variable "custom_policy_definition_name_prefix" {
+  type        = string
+  description = "Prefix prepended to each supplemental custom policy definition name. Leave empty to use names as authored in custom-definitions/."
+  default     = ""
 }
 
 variable "initiative_name" {
   type        = string
-  description = "Name of the policy set definition (initiative)."
+  description = "Name of the policy set definition (combined initiative)."
   default     = "Deny-PublicPaaSEndpoints"
 }
 
 variable "assignment_name" {
   type        = string
   description = "Name of the policy assignment. Azure caps assignment names at 24 characters."
-  default     = "alz-deny-public-paas"
+  default     = "deny-all-public-paas"
 
   validation {
     condition     = length(var.assignment_name) <= 24
@@ -35,7 +41,7 @@ variable "assignment_name" {
 variable "assignment_display_name" {
   type        = string
   description = "Display name shown for the assignment in the portal."
-  default     = "Enforce private endpoints across PaaS services (ALZ)"
+  default     = "Enforce private endpoints across all PaaS services (62)"
 }
 
 # ---------------------------------------------------------------------------
@@ -49,13 +55,13 @@ variable "non_compliance_message" {
 
 variable "override_effects_globally" {
   type        = bool
-  description = "Force every bundled policy parameter to the value of `effect`. False (default) respects ALZ initiative defaults — 43 of 45 already default to Deny."
+  description = "Force every bundled policy parameter to the value of `effect`. False (default) respects ALZ initiative defaults (43 of 45 are Deny) AND uses `effect` only for the 17 supplemental policies."
   default     = false
 }
 
 variable "effect" {
   type        = string
-  description = "Effect propagated to every bundled policy when override_effects_globally = true."
+  description = "Effect applied to the 17 supplemental policies always, and to ALL 62 policies when override_effects_globally = true."
   default     = "Deny"
 
   validation {

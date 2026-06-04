@@ -1,10 +1,15 @@
-output "custom_logic_app_policy_id" {
-  description = "Resource ID of the deployed Logic App custom policy definition."
+output "logic_app_policy_id" {
+  description = "Resource ID of the deployed ALZ Logic App custom policy definition."
   value       = azurerm_policy_definition.logic_app.id
 }
 
+output "supplemental_policy_ids" {
+  description = "Map of supplemental custom policy definition name -> resource ID (17 entries)."
+  value       = { for k, v in azurerm_policy_definition.supplemental : k => v.id }
+}
+
 output "initiative_id" {
-  description = "Resource ID of the deployed initiative (policy set definition)."
+  description = "Resource ID of the deployed combined initiative (policy set definition)."
   value       = azurerm_policy_set_definition.this.id
 }
 
@@ -14,7 +19,7 @@ output "assignment_id" {
 }
 
 output "bundled_policy_count" {
-  description = "Number of policies bundled inside the initiative."
+  description = "Number of policies bundled inside the combined initiative."
   value       = length(local.initiative_raw.properties.policyDefinitions)
 }
 

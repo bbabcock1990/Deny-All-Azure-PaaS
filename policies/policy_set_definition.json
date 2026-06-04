@@ -5,12 +5,12 @@
   "scope": null,
   "properties": {
     "policyType": "Custom",
-    "displayName": "Public network access should be disabled for PaaS services",
-    "description": "This policy initiative is a group of policies that prevents creation of Azure PaaS services with exposed public endpoints",
+    "displayName": "Public network access should be disabled for PaaS services (Combined - ALZ + Supplemental)",
+    "description": "Combined initiative covering 62 Azure PaaS services that support Private Link. Bundles the 45 services from the Azure Landing Zones Deny-PublicPaaSEndpoints initiative PLUS 17 additional services covered by custom-authored definitions in this repo (policies/custom-definitions/). Default non-compliance message: 'Private Endpoints Must Be Enabled - No Public Access'.",
     "metadata": {
-      "version": "5.2.0",
+      "version": "6.0.0",
       "category": "Network",
-      "source": "https://github.com/Azure/Enterprise-Scale/",
+      "source": "https://github.com/bbabcock1990/Deny-All-Azure-PaaS",
       "alzCloudEnvironments": [
         "AzureCloud"
       ]
@@ -514,8 +514,22 @@
           "Deny",
           "Disabled"
         ]
+      },
+      "effect": {
+        "type": "String",
+        "metadata": {
+          "displayName": "Effect",
+          "description": "Effect applied uniformly to every bundled custom policy."
+        },
+        "allowedValues": [
+          "Audit",
+          "Deny",
+          "Disabled"
+        ],
+        "defaultValue": "Deny"
       }
     },
+    "policyDefinitionGroups": null,
     "policyDefinitions": [
       {
         "policyDefinitionReferenceId": "CosmosDenyPaasPublicIP",
@@ -1011,8 +1025,177 @@
         },
         "groupNames": [],
         "definitionVersion": "1.*.*"
+      },
+      {
+        "policyDefinitionReferenceId": "Deny-SignalR-Public-Network-Access",
+        "policyDefinitionId": "${managementGroupResourceId}/providers/Microsoft.Authorization/policyDefinitions/Deny-SignalR-Public-Network-Access",
+        "parameters": {
+          "effect": {
+            "value": "[parameters('effect')]"
+          }
+        },
+        "groupNames": []
+      },
+      {
+        "policyDefinitionReferenceId": "Deny-WebPubSub-Public-Network-Access",
+        "policyDefinitionId": "${managementGroupResourceId}/providers/Microsoft.Authorization/policyDefinitions/Deny-WebPubSub-Public-Network-Access",
+        "parameters": {
+          "effect": {
+            "value": "[parameters('effect')]"
+          }
+        },
+        "groupNames": []
+      },
+      {
+        "policyDefinitionReferenceId": "Deny-IoTHub-Public-Network-Access",
+        "policyDefinitionId": "${managementGroupResourceId}/providers/Microsoft.Authorization/policyDefinitions/Deny-IoTHub-Public-Network-Access",
+        "parameters": {
+          "effect": {
+            "value": "[parameters('effect')]"
+          }
+        },
+        "groupNames": []
+      },
+      {
+        "policyDefinitionReferenceId": "Deny-IoTDps-Public-Network-Access",
+        "policyDefinitionId": "${managementGroupResourceId}/providers/Microsoft.Authorization/policyDefinitions/Deny-IoTDps-Public-Network-Access",
+        "parameters": {
+          "effect": {
+            "value": "[parameters('effect')]"
+          }
+        },
+        "groupNames": []
+      },
+      {
+        "policyDefinitionReferenceId": "Deny-Purview-Public-Network-Access",
+        "policyDefinitionId": "${managementGroupResourceId}/providers/Microsoft.Authorization/policyDefinitions/Deny-Purview-Public-Network-Access",
+        "parameters": {
+          "effect": {
+            "value": "[parameters('effect')]"
+          }
+        },
+        "groupNames": []
+      },
+      {
+        "policyDefinitionReferenceId": "Deny-HealthcareApis-Services-Public-Network-Access",
+        "policyDefinitionId": "${managementGroupResourceId}/providers/Microsoft.Authorization/policyDefinitions/Deny-HealthcareApis-Services-Public-Network-Access",
+        "parameters": {
+          "effect": {
+            "value": "[parameters('effect')]"
+          }
+        },
+        "groupNames": []
+      },
+      {
+        "policyDefinitionReferenceId": "Deny-HealthDataServices-Workspace-Public-Network-Access",
+        "policyDefinitionId": "${managementGroupResourceId}/providers/Microsoft.Authorization/policyDefinitions/Deny-HealthDataServices-Workspace-Public-Network-Access",
+        "parameters": {
+          "effect": {
+            "value": "[parameters('effect')]"
+          }
+        },
+        "groupNames": []
+      },
+      {
+        "policyDefinitionReferenceId": "Deny-HealthDataServices-FHIR-Public-Network-Access",
+        "policyDefinitionId": "${managementGroupResourceId}/providers/Microsoft.Authorization/policyDefinitions/Deny-HealthDataServices-FHIR-Public-Network-Access",
+        "parameters": {
+          "effect": {
+            "value": "[parameters('effect')]"
+          }
+        },
+        "groupNames": []
+      },
+      {
+        "policyDefinitionReferenceId": "Deny-HealthDataServices-DICOM-Public-Network-Access",
+        "policyDefinitionId": "${managementGroupResourceId}/providers/Microsoft.Authorization/policyDefinitions/Deny-HealthDataServices-DICOM-Public-Network-Access",
+        "parameters": {
+          "effect": {
+            "value": "[parameters('effect')]"
+          }
+        },
+        "groupNames": []
+      },
+      {
+        "policyDefinitionReferenceId": "Deny-StaticWebApps-Public-Network-Access",
+        "policyDefinitionId": "${managementGroupResourceId}/providers/Microsoft.Authorization/policyDefinitions/Deny-StaticWebApps-Public-Network-Access",
+        "parameters": {
+          "effect": {
+            "value": "[parameters('effect')]"
+          }
+        },
+        "groupNames": []
+      },
+      {
+        "policyDefinitionReferenceId": "Deny-Relay-Public-Network-Access",
+        "policyDefinitionId": "${managementGroupResourceId}/providers/Microsoft.Authorization/policyDefinitions/Deny-Relay-Public-Network-Access",
+        "parameters": {
+          "effect": {
+            "value": "[parameters('effect')]"
+          }
+        },
+        "groupNames": []
+      },
+      {
+        "policyDefinitionReferenceId": "Deny-HDInsight-Public-Network-Access",
+        "policyDefinitionId": "${managementGroupResourceId}/providers/Microsoft.Authorization/policyDefinitions/Deny-HDInsight-Public-Network-Access",
+        "parameters": {
+          "effect": {
+            "value": "[parameters('effect')]"
+          }
+        },
+        "groupNames": []
+      },
+      {
+        "policyDefinitionReferenceId": "Deny-CommunicationServices-Public-Network-Access",
+        "policyDefinitionId": "${managementGroupResourceId}/providers/Microsoft.Authorization/policyDefinitions/Deny-CommunicationServices-Public-Network-Access",
+        "parameters": {
+          "effect": {
+            "value": "[parameters('effect')]"
+          }
+        },
+        "groupNames": []
+      },
+      {
+        "policyDefinitionReferenceId": "Deny-DigitalTwins-Public-Network-Access",
+        "policyDefinitionId": "${managementGroupResourceId}/providers/Microsoft.Authorization/policyDefinitions/Deny-DigitalTwins-Public-Network-Access",
+        "parameters": {
+          "effect": {
+            "value": "[parameters('effect')]"
+          }
+        },
+        "groupNames": []
+      },
+      {
+        "policyDefinitionReferenceId": "Deny-VideoIndexer-Public-Network-Access",
+        "policyDefinitionId": "${managementGroupResourceId}/providers/Microsoft.Authorization/policyDefinitions/Deny-VideoIndexer-Public-Network-Access",
+        "parameters": {
+          "effect": {
+            "value": "[parameters('effect')]"
+          }
+        },
+        "groupNames": []
+      },
+      {
+        "policyDefinitionReferenceId": "Deny-LogAnalytics-Public-Network-Access",
+        "policyDefinitionId": "${managementGroupResourceId}/providers/Microsoft.Authorization/policyDefinitions/Deny-LogAnalytics-Public-Network-Access",
+        "parameters": {
+          "effect": {
+            "value": "[parameters('effect')]"
+          }
+        },
+        "groupNames": []
+      },
+      {
+        "policyDefinitionReferenceId": "Deny-AppInsights-Public-Network-Access",
+        "policyDefinitionId": "${managementGroupResourceId}/providers/Microsoft.Authorization/policyDefinitions/Deny-AppInsights-Public-Network-Access",
+        "parameters": {
+          "effect": {
+            "value": "[parameters('effect')]"
+          }
+        },
+        "groupNames": []
       }
-    ],
-    "policyDefinitionGroups": null
+    ]
   }
 }

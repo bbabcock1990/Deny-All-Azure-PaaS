@@ -1,52 +1,79 @@
 # =============================================================================
-# Deny-All-Azure-PaaS — Terraform implementation
+# Deny-All-Azure-PaaS — Combined Terraform implementation
 # -----------------------------------------------------------------------------
 # Mirrors bicep/main.bicep:
-#   1. Loads the ALZ source JSON from ../policies/
-#   2. Deploys the one custom Logic App policy definition
-#   3. Resolves the ${varTargetManagementGroupResourceId} placeholder by
-#      substituting the deployed definition's actual ID wherever the suffix
-#      "/policyDefinitions/Deny-LogicApp-Public-Network" appears.
-#   4. Deploys the initiative referencing 44 built-ins + the custom policy
-#   5. Assigns the initiative at the target management group with a custom
-#      deny / non-compliance message replicated per bundled policy reference.
+#   1. Loads the combined initiative manifest from ../policies/
+#   2. Deploys the ALZ custom Logic App policy definition
+#   3. Discovers + deploys every Deny-*.json in ../policies/custom-definitions/
+#      (17 supplemental custom policies — fileset() means adding a new gap
+#       definition needs zero Terraform edits)
+#   4. Resolves every initiative reference URL:
+#        * built-ins                       -> as-is
+#        * ALZ Logic App custom            -> deployed .id
+#        * supplemental custom (by name)   -> deployed .id (lookup)
+#   5. Deploys the combined initiative
+#   6. Assigns it at the target MG with the custom deny message replicated
+#      per bundled reference
 # =============================================================================
 
 locals {
-  # ---- Source-of-truth ALZ files (DO NOT hand-edit) ----
-  initiative_raw   = jsondecode(file("${path.module}/../policies/policy_set_definition_es_Deny-PublicPaaSEndpoints.json"))
-  logic_app_policy = jsondecode(file("${path.module}/../policies/policy_definitions/policy_definition_es_Deny-LogicApp-Public-Network.json"))
+  policies_root            = "${path.module}/../policies"
+  custom_definitions_root  = "${local.policies_root}/custom-definitions"
 
-  # Target MG resource ID (Terraform-native form)
+  # ----- Source-of-truth files -----
+  initiative_raw   = jsondecode(file("${local.policies_root}/policy_set_definition.json"))
+  logic_app_policy = jsondecode(file("${local.policies_root}/policy_definitions/policy_definition_es_Deny-LogicApp-Public-Network.json"))
+
+  # ----- Discover supplemental custom definitions -----
+  # Glob picks up every Deny-*.json in custom-definitions/. Adding a new gap
+  # definition = drop a JSON file alongside the others and add a reference in
+  # policies/policy_set_definition.json. No Terraform edits needed.
+  custom_def_files = fileset(local.custom_definitions_root, "Deny-*.json")
+  custom_defs = {
+    for f in local.custom_def_files :
+    jsondecode(file("${local.custom_definitions_root}/${f}")).name => jsondecode(file("${local.custom_definitions_root}/${f}"))
+  }
+
+  # ----- Target MG resource ID (Terraform-native form) -----
   management_group_resource_id = "/providers/Microsoft.Management/managementGroups/${var.management_group_id}"
 
-  # ALZ-source suffix that identifies the custom Logic App policy reference
-  alz_custom_policy_suffix = "/policyDefinitions/Deny-LogicApp-Public-Network"
+  # ----- Resolution rules for initiative references -----
+  alz_logic_app_suffix    = "/policyDefinitions/Deny-LogicApp-Public-Network"
+  supplemental_policy_set = keys(local.custom_defs)
 
-  # Resolve every policy reference: when the URL ends with the ALZ custom
-  # policy suffix, swap it for the actual deployed resource ID; otherwise
-  # leave the built-in reference alone.
   resolved_policy_refs = [
     for p in local.initiative_raw.properties.policyDefinitions : {
-      reference_id         = p.policyDefinitionReferenceId
-      policy_definition_id = endswith(p.policyDefinitionId, local.alz_custom_policy_suffix) ? azurerm_policy_definition.logic_app.id : p.policyDefinitionId
-      parameters           = lookup(p, "parameters", {})
-      version              = lookup(p, "definitionVersion", null)
+      reference_id = p.policyDefinitionReferenceId
+      policy_definition_id = (
+        contains(local.supplemental_policy_set, p.policyDefinitionReferenceId)
+          ? azurerm_policy_definition.supplemental[p.policyDefinitionReferenceId].id
+          : (endswith(p.policyDefinitionId, local.alz_logic_app_suffix)
+              ? azurerm_policy_definition.logic_app.id
+              : p.policyDefinitionId)
+      )
+      parameters = lookup(p, "parameters", {})
+      version    = lookup(p, "definitionVersion", null)
     }
   ]
 
-  # Optional global override — { paramName = { value = effect } }
+  # Optional global override — every initiative param set to var.effect
   global_effect_overrides = {
     for k in keys(local.initiative_raw.properties.parameters) :
     k => { value = var.effect }
   }
+
+  # Default assignment parameters — only the supplemental `effect` is set;
+  # the 45 ALZ params fall through to their initiative defaults.
+  default_assignment_parameters = {
+    effect = { value = var.effect }
+  }
 }
 
 # ---------------------------------------------------------------------------
-# 1. Custom Logic App policy definition
+# 1. ALZ custom Logic App policy definition
 # ---------------------------------------------------------------------------
 resource "azurerm_policy_definition" "logic_app" {
-  name                = var.custom_policy_definition_name
+  name                = var.logic_app_policy_definition_name
   policy_type         = "Custom"
   mode                = local.logic_app_policy.properties.mode
   display_name        = local.logic_app_policy.properties.displayName
@@ -59,7 +86,25 @@ resource "azurerm_policy_definition" "logic_app" {
 }
 
 # ---------------------------------------------------------------------------
-# 2. Initiative (policy set definition)
+# 2. Supplemental custom policy definitions (17 from custom-definitions/)
+# ---------------------------------------------------------------------------
+resource "azurerm_policy_definition" "supplemental" {
+  for_each = local.custom_defs
+
+  name                = "${var.custom_policy_definition_name_prefix}${each.value.name}"
+  policy_type         = "Custom"
+  mode                = each.value.properties.mode
+  display_name        = each.value.properties.displayName
+  description         = each.value.properties.description
+  management_group_id = local.management_group_resource_id
+
+  metadata    = jsonencode(each.value.properties.metadata)
+  parameters  = jsonencode(each.value.properties.parameters)
+  policy_rule = jsonencode(each.value.properties.policyRule)
+}
+
+# ---------------------------------------------------------------------------
+# 3. Combined initiative (policy set definition)
 # ---------------------------------------------------------------------------
 resource "azurerm_policy_set_definition" "this" {
   name                = var.initiative_name
@@ -81,21 +126,26 @@ resource "azurerm_policy_set_definition" "this" {
     }
   }
 
-  depends_on = [azurerm_policy_definition.logic_app]
+  depends_on = [
+    azurerm_policy_definition.logic_app,
+    azurerm_policy_definition.supplemental,
+  ]
 }
 
 # ---------------------------------------------------------------------------
-# 3. Assignment with the custom deny message
+# 4. Assignment with the custom deny message
 # ---------------------------------------------------------------------------
 resource "azurerm_management_group_policy_assignment" "this" {
   name                 = var.assignment_name
   policy_definition_id = azurerm_policy_set_definition.this.id
   management_group_id  = local.management_group_resource_id
   display_name         = var.assignment_display_name
-  description          = "Blocks deployment of Azure PaaS services that allow public network access. Wraps the Azure Landing Zones Deny-PublicPaaSEndpoints initiative."
+  description          = "Blocks deployment of Azure PaaS services that allow public network access. Combined ALZ + supplemental initiative covering 62 services."
   enforce              = true
 
-  parameters = var.override_effects_globally ? jsonencode(local.global_effect_overrides) : null
+  parameters = jsonencode(
+    var.override_effects_globally ? local.global_effect_overrides : local.default_assignment_parameters
+  )
 
   dynamic "non_compliance_message" {
     for_each = local.initiative_raw.properties.policyDefinitions
