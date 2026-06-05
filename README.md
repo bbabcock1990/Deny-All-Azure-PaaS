@@ -25,6 +25,7 @@ All 62 services are bundled into **one initiative**, deployed with **one wrapper
 - [Customisation](#customisation)
 - [Verifying the deployment](#verifying-the-deployment)
 - [Automated validation (62 services)](#automated-validation-62-services)
+- [Just want a tiny single-service demo?](#just-want-a-tiny-single-service-demo)
 - [What's blocked (62 services)](#whats-blocked-62-services)
 - [Adding new resource types in the future](#adding-new-resource-types-in-the-future)
 - [Upgrading](#upgrading)
@@ -75,6 +76,10 @@ The Bicep and Terraform wrappers do the same five things:
 ├── validation-testing/                                      ← end-to-end policy validation harness
 │   ├── README.md                                            ← how to run + interpret results
 │   └── validate_policy.py                                   ← 62-service test harness
+├── simple-test/                                             ← tiny "hello world" single-policy demo
+│   ├── README.md                                            ← deploy + test walkthrough
+│   ├── deny-storage-public.bicep                            ← one-policy Bicep (sub scope)
+│   └── verify.py                                            ← validates Enabled = DENY, Disabled = ALLOW
 ├── LICENSE
 └── README.md
 ```
@@ -284,6 +289,26 @@ can be wired into CI as a guardrail.
 See [`validation-testing/README.md`](validation-testing/README.md) for
 prerequisites, environment variables, how to interpret each result, how
 to add a test for a new service, and a sample GitHub Actions snippet.
+
+---
+
+## Just want a tiny single-service demo?
+
+If you don't need the full 62-service initiative and just want a quick
+**"hello world"** demo of one deny policy you can deploy and test in
+under five minutes, see [`simple-test/`](simple-test/). That folder
+contains:
+
+- **`deny-storage-public.bicep`** — one subscription-scoped Bicep file
+  that deploys a single custom policy + assignment blocking Storage
+  Accounts with public network access enabled.
+- **`verify.py`** — runs `az deployment group validate` twice (enabled
+  → expect DENY, disabled → expect ALLOW) and exits 0 on success.
+- **`README.md`** — copy-paste deploy / test / clean-up walkthrough.
+
+Use this folder to learn the pattern, demo the concept on a single
+subscription, or rule out integration issues before deploying the full
+initiative at management-group scope.
 
 ---
 
