@@ -12,6 +12,10 @@ main.json
 **/crash.log
 **/crash.*.log
 
+# Validation harness output (regenerated on each run)
+validation-testing/validation_results.json
+validation-testing/__pycache__/
+
 # OS
 .DS_Store
 Thumbs.db

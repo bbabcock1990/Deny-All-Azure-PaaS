@@ -24,6 +24,7 @@ All 62 services are bundled into **one initiative**, deployed with **one wrapper
 - [Quickstart — Terraform](#quickstart--terraform)
 - [Customisation](#customisation)
 - [Verifying the deployment](#verifying-the-deployment)
+- [Automated validation (62 services)](#automated-validation-62-services)
 - [What's blocked (62 services)](#whats-blocked-62-services)
 - [Adding new resource types in the future](#adding-new-resource-types-in-the-future)
 - [Upgrading](#upgrading)
@@ -71,6 +72,9 @@ The Bicep and Terraform wrappers do the same five things:
 │   ├── main.tf
 │   ├── outputs.tf
 │   └── terraform.tfvars.example
+├── validation-testing/                                      ← end-to-end policy validation harness
+│   ├── README.md                                            ← how to run + interpret results
+│   └── validate_policy.py                                   ← 62-service test harness
 ├── LICENSE
 └── README.md
 ```
@@ -231,6 +235,55 @@ az storage account create \
   -n stpetest$RANDOM -g <some-rg> -l eastus --sku Standard_LRS
 # → RequestDisallowedByPolicy with your custom message in `additionalInfo`
 ```
+
+For a fully automated end-to-end check of all 62 services, see
+[Automated validation](#automated-validation-62-services) below.
+
+---
+
+## Automated validation (62 services)
+
+The [`validation-testing/`](validation-testing/) folder contains a
+Python harness that confirms every one of the 62 references in the
+initiative actually denies a non-compliant deployment **and** that your
+custom non-compliance message is returned to the caller.
+
+The script is **read-only** — it submits one minimal ARM template per
+service through `az deployment group validate`, which runs the full
+Azure Policy evaluation engine **without creating any resources**. A
+clean run takes ~3–4 minutes, consumes no quota, and creates nothing to
+clean up.
+
+### Quick run (Cloud Shell or local)
+
+```bash
+cd validation-testing
+
+# point at any sub that inherits the assignment + an existing RG inside it
+export VAL_SUB_ID="<subscription-id>"
+export VAL_TENANT_ID="<tenant-id>"
+export VAL_RG="<existing-rg-name>"
+
+python validate_policy.py
+```
+
+A clean run prints:
+
+```
+[PASS]  Denied at deploy time, expected ref fired:    58
+[PASS*] Denied at deploy time, by overlapping ref:     2
+[AUDIT] Audit-only by upstream ALZ design (ok):        2
+[FAIL]  Other errors / unknown:                        0
+[!!!!]  Unexpected allow (regression!):                0
+[MSG]   Custom non-compliance message visible in:     60/62
+```
+
+The script exits non-zero on any unexpected allow or other error, so it
+can be wired into CI as a guardrail.
+
+See [`validation-testing/README.md`](validation-testing/README.md) for
+prerequisites, environment variables, how to interpret each result, how
+to add a test for a new service, and a sample GitHub Actions snippet.
 
 ---
 
