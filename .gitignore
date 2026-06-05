@@ -1,6 +1,7 @@
 # Bicep build artifacts
 *.json.bak
 main.json
+simple-test/bicep/deny-storage-public.json
 
 # Terraform
 **/.terraform/

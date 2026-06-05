@@ -1,12 +1,21 @@
 # Simple Test — Deny Public Network Access on Storage Accounts
 
-The smallest possible end-to-end example: **one Bicep file** deploys
-**one custom Azure Policy** that blocks creation of Storage Accounts
-that allow public network access, and **one Python script** verifies it
-works.
+The smallest possible end-to-end example: **one policy** that blocks
+creation of Storage Accounts that allow public network access, plus a
+**one-command verification script**.
+
+Two implementations of the same policy are included — pick whichever
+matches your IaC stack:
+
+- **[`bicep/`](bicep/)** — single Bicep file, subscription-scoped.
+- **[`terraform/`](terraform/)** — single Terraform module (3 files +
+  one example tfvars), subscription-scoped.
+
+Both produce an identical policy definition + assignment with the same
+custom non-compliance message. `verify.py` works against either one.
 
 This is a self-contained "hello world" version of the main project — no
-initiatives, no Terraform, no management groups. Deploy at any
+initiatives, no management groups, no JSON wrangling. Deploy at any
 subscription, test, and tear down in under five minutes.
 
 ---
@@ -37,37 +46,28 @@ then deny
 3. **Active subscription set**: `az account set --subscription "<sub-name-or-id>"`.
 4. **Permissions**: `Owner` or `User Access Administrator` at the
    subscription scope (needed to create the policy assignment).
-5. **Python 3.8+** (only if you want to run the scripted `verify.py`).
-
-Bicep CLI is bundled with `az` — nothing else to install.
+5. **For Bicep**: the Bicep CLI is bundled with `az` — nothing else to install.
+6. **For Terraform**: Terraform 1.5+ on your `PATH`
+   (`terraform -version`). Cloud Shell already has it.
+7. **For the scripted verification**: Python 3.8+.
 
 ---
 
 ## Step 1 — Deploy the policy
 
-From this folder:
+### Option A — Bicep
+
+From the `bicep/` subfolder:
 
 ```bash
+cd bicep
+
 az deployment sub create \
   --location eastus \
   --template-file deny-storage-public.bicep
 ```
 
-Outputs:
-- A custom policy definition named `deny-storage-public-network-access`.
-- A policy assignment named `deny-storage-public` at the subscription scope.
-
-### Optional parameters
-
-| Parameter | Default | Notes |
-|---|---|---|
-| `policyName` | `deny-storage-public-network-access` | Name of the custom policy definition. |
-| `assignmentName` | `deny-storage-public` | Name of the assignment. |
-| `policyDisplayName` | `Storage accounts must disable public network access` | Shown in the portal. |
-| `nonComplianceMessage` | `Private Endpoints Must Be Enabled - No Public Access` | The custom message returned to anyone who is blocked. |
-| `effect` | `Deny` | `Audit` (soft rollout) or `Disabled` (turn off) are also accepted. |
-
-Example with overrides:
+Optional parameter overrides:
 
 ```bash
 az deployment sub create \
@@ -77,12 +77,81 @@ az deployment sub create \
                nonComplianceMessage="Storage public access is forbidden in this subscription."
 ```
 
-### Want subscription scope vs management-group scope?
+Available parameters:
 
-This template deploys at **subscription scope**. To deploy at a
-management-group scope instead, change the first line of the Bicep file
-from `targetScope = 'subscription'` to `targetScope = 'managementGroup'`
-and deploy with `az deployment mg create ... --management-group-id <mg>`.
+| Parameter | Default | Notes |
+|---|---|---|
+| `policyName` | `deny-storage-public-network-access` | Name of the custom policy definition. |
+| `assignmentName` | `deny-storage-public` | Name of the assignment. |
+| `policyDisplayName` | `Storage accounts must disable public network access` | Shown in the portal. |
+| `nonComplianceMessage` | `Private Endpoints Must Be Enabled - No Public Access` | Returned to anyone whose deployment is blocked. |
+| `effect` | `Deny` | `Audit` or `Disabled` also accepted. |
+
+#### Switching to management-group scope
+
+The Bicep file uses `targetScope = 'subscription'`. To deploy at a
+management-group scope instead, change that line to
+`targetScope = 'managementGroup'` and deploy with:
+
+```bash
+az deployment mg create --management-group-id <mg-id> --location eastus \
+  --template-file deny-storage-public.bicep
+```
+
+### Option B — Terraform
+
+From the `terraform/` subfolder:
+
+```bash
+cd terraform
+
+# (one-time) initialise providers
+terraform init
+
+# review what will be created
+terraform plan
+
+# create the policy + assignment in the subscription the Azure CLI is signed in to
+terraform apply
+```
+
+Optional parameter overrides — copy the example tfvars and uncomment
+anything you want to change:
+
+```bash
+cp terraform.tfvars.example terraform.tfvars
+# edit terraform.tfvars
+terraform apply
+```
+
+Or pass directly:
+
+```bash
+terraform apply \
+  -var "effect=Audit" \
+  -var 'non_compliance_message=Storage public access is forbidden in this subscription.'
+```
+
+Available variables:
+
+| Variable | Default | Notes |
+|---|---|---|
+| `policy_name` | `deny-storage-public-network-access` | Name of the custom policy definition. |
+| `assignment_name` | `deny-storage-public` | Name of the assignment. |
+| `policy_display_name` | `Storage accounts must disable public network access` | Shown in the portal. |
+| `non_compliance_message` | `Private Endpoints Must Be Enabled - No Public Access` | Returned to anyone whose deployment is blocked. |
+| `effect` | `Deny` | `Audit` or `Disabled` also accepted. |
+
+#### Switching to management-group scope
+
+Edit `terraform/main.tf` and replace
+`azurerm_subscription_policy_assignment` with
+`azurerm_management_group_policy_assignment`, swap the
+`subscription_id` argument for `management_group_id =
+"/providers/Microsoft.Management/managementGroups/<mg-id>"`, and rerun
+`terraform apply`. The policy *definition* can stay at subscription
+scope or be moved alongside (replace `azurerm_policy_definition` with
+`azurerm_management_group_policy_definition`).
 
 ---
 
@@ -123,14 +192,13 @@ az storage account create \
   --public-network-access Disabled
 ```
 
-This one succeeds and creates a (private-only) storage account.
-
 ---
 
 ## Step 2 (alternative) — Scripted verification
 
 `verify.py` runs both tests automatically using `az deployment group
-validate` (no resources are actually created — fast, no cleanup):
+validate` (no resources are actually created — fast, no cleanup
+required):
 
 ```bash
 export VAL_RG=storage-policy-test-rg
@@ -158,11 +226,14 @@ Expected output:
 Both tests passed. The Storage public-access deny policy is enforcing as expected.
 ```
 
-Exit code is `0` on success, `1` on any failure.
+Exit code is `0` on success, `1` on any failure. The script works
+identically whether the policy was deployed via Bicep or Terraform.
 
 ---
 
 ## Step 3 — Clean up
+
+### If you deployed with Bicep
 
 ```bash
 # Any test storage account you created
@@ -174,6 +245,20 @@ az group delete -n storage-policy-test-rg --yes --no-wait
 # Policy assignment and definition
 az policy assignment delete --name deny-storage-public
 az policy definition delete --name deny-storage-public-network-access
+```
+
+### If you deployed with Terraform
+
+```bash
+# Any test storage account you created
+az storage account delete -n <name> -g storage-policy-test-rg --yes
+
+# The test resource group
+az group delete -n storage-policy-test-rg --yes --no-wait
+
+# Tear down the policy + assignment
+cd terraform
+terraform destroy
 ```
 
 ---
@@ -190,8 +275,16 @@ az policy definition delete --name deny-storage-public-network-access
 
 ## Files
 
-| File | Purpose |
-|---|---|
-| `deny-storage-public.bicep` | Subscription-scoped Bicep — policy definition + assignment. |
-| `verify.py` | Scripted validation: enabled (expect DENY) + disabled (expect ALLOW). |
-| `README.md` | This file. |
+```
+simple-test/
+├── README.md                                 ← this file
+├── verify.py                                 ← scripted DENY/ALLOW test (shared)
+├── bicep/
+│   └── deny-storage-public.bicep             ← single Bicep file
+└── terraform/
+    ├── providers.tf                          ← provider + version pins
+    ├── variables.tf                          ← input variables
+    ├── main.tf                               ← policy definition + assignment
+    ├── outputs.tf                            ← exported IDs + effect / message
+    └── terraform.tfvars.example              ← copy to terraform.tfvars to override
+```

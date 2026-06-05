@@ -1,5 +1,5 @@
 // =============================================================================
-// Simple test — Deny public network access on Storage Accounts
+// Simple test — Deny public network access on Storage Accounts (Bicep)
 //
 // Deploys one custom Azure Policy + one assignment at the subscription scope
 // that blocks creation of Microsoft.Storage/storageAccounts whose
@@ -8,12 +8,12 @@
 // Anyone whose deployment is blocked sees the custom non-compliance message
 // (configurable via the `nonComplianceMessage` parameter).
 //
-// Deploy:
+// Deploy from this folder:
 //   az deployment sub create \
 //     --location eastus \
 //     --template-file deny-storage-public.bicep
 //
-// See README.md in this folder for the full walkthrough + test commands.
+// See ../README.md for the full walkthrough + test commands.
 // =============================================================================
 
 targetScope = 'subscription'

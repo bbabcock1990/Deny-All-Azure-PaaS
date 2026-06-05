@@ -1,0 +1,8 @@
+# All variables have sensible defaults — copy this file to terraform.tfvars
+# and uncomment the lines you want to override.
+
+# policy_name            = "deny-storage-public-network-access"
+# assignment_name        = "deny-storage-public"
+# policy_display_name    = "Storage accounts must disable public network access"
+# non_compliance_message = "Private Endpoints Must Be Enabled - No Public Access"
+# effect                 = "Deny"   # or "Audit" / "Disabled"

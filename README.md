@@ -77,9 +77,16 @@ The Bicep and Terraform wrappers do the same five things:
 │   ├── README.md                                            ← how to run + interpret results
 │   └── validate_policy.py                                   ← 62-service test harness
 ├── simple-test/                                             ← tiny "hello world" single-policy demo
-│   ├── README.md                                            ← deploy + test walkthrough
-│   ├── deny-storage-public.bicep                            ← one-policy Bicep (sub scope)
-│   └── verify.py                                            ← validates Enabled = DENY, Disabled = ALLOW
+│   ├── README.md                                            ← deploy + test walkthrough (Bicep & Terraform)
+│   ├── verify.py                                            ← validates Enabled = DENY, Disabled = ALLOW
+│   ├── bicep/
+│   │   └── deny-storage-public.bicep                        ← one-policy Bicep (sub scope)
+│   └── terraform/                                           ← same policy in Terraform
+│       ├── providers.tf
+│       ├── variables.tf
+│       ├── main.tf
+│       ├── outputs.tf
+│       └── terraform.tfvars.example
 ├── LICENSE
 └── README.md
 ```
@@ -297,14 +304,19 @@ to add a test for a new service, and a sample GitHub Actions snippet.
 If you don't need the full 62-service initiative and just want a quick
 **"hello world"** demo of one deny policy you can deploy and test in
 under five minutes, see [`simple-test/`](simple-test/). That folder
-contains:
+contains the same single-policy demo implemented in **both Bicep and
+Terraform**:
 
-- **`deny-storage-public.bicep`** — one subscription-scoped Bicep file
-  that deploys a single custom policy + assignment blocking Storage
-  Accounts with public network access enabled.
-- **`verify.py`** — runs `az deployment group validate` twice (enabled
-  → expect DENY, disabled → expect ALLOW) and exits 0 on success.
-- **`README.md`** — copy-paste deploy / test / clean-up walkthrough.
+- **`bicep/deny-storage-public.bicep`** — one subscription-scoped Bicep
+  file that deploys a single custom policy + assignment blocking
+  Storage Accounts with public network access enabled.
+- **`terraform/`** — the same policy + assignment as a small Terraform
+  module (`providers.tf`, `variables.tf`, `main.tf`, `outputs.tf`).
+- **`verify.py`** — works against either deployment; runs
+  `az deployment group validate` twice (enabled → expect DENY,
+  disabled → expect ALLOW) and exits 0 on success.
+- **`README.md`** — copy-paste deploy / test / clean-up walkthrough for
+  both stacks.
 
 Use this folder to learn the pattern, demo the concept on a single
 subscription, or rule out integration issues before deploying the full
