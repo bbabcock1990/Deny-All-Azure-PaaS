@@ -121,7 +121,11 @@ resource "azurerm_policy_set_definition" "this" {
     content {
       reference_id         = policy_definition_reference.value.reference_id
       policy_definition_id = policy_definition_reference.value.policy_definition_id
-      parameter_values     = jsonencode(policy_definition_reference.value.parameters)
+      # Convert ARM-template-escaped "[[parameters('X')]" (used by ALZ source JSON
+      # so ARM expands the escape at deploy time) to the literal "[parameters('X')]"
+      # that the Azure Policy REST API expects. Terraform calls the REST API
+      # directly and does not perform ARM expression evaluation.
+      parameter_values     = replace(jsonencode(policy_definition_reference.value.parameters), "[[parameters(", "[parameters(")
       version              = policy_definition_reference.value.version
     }
   }

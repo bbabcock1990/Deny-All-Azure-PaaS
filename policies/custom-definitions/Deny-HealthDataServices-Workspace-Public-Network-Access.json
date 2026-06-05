@@ -7,7 +7,7 @@
     "policyType": "Custom",
     "mode": "All",
     "displayName": "Azure Health Data Services workspace should disable public network access",
-    "description": "Disabling public network access improves security by ensuring that the Azure Health Data Services workspace (Microsoft.HealthcareApis/workspaces) is not exposed on the public internet and can only be reached from a private endpoint. Microsoft's built-in policy only audits for an approved private endpoint connection; this custom definition denies on the publicNetworkAccess field for stronger enforcement. Child FHIR and DICOM services inherit the workspace's connectivity unless they explicitly override it. Learn more at: https://aka.ms/healthcareapisprivatelink.",
+    "description": "Disabling public network access ensures the Azure Health Data Services workspace (Microsoft.HealthcareApis/workspaces) is reachable only through a private endpoint. Microsoft's built-in policy only audits for an approved private endpoint connection; this definition denies on the publicNetworkAccess field directly for stronger enforcement. Child FHIR and DICOM services inherit the workspace connectivity unless overridden. See https://aka.ms/healthcareapisprivatelink.",
     "metadata": {
       "version": "1.0.0",
       "category": "Health Data Services workspace",
